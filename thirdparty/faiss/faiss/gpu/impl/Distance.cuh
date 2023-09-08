@@ -74,7 +74,7 @@ void runL2Distance(
         Tensor<uint8_t, 1, true>& bitset,
         int k,
         Tensor<float, 2, true>& outDistances,
-        Tensor<int, 2, true>& outIndices,
+        Tensor<idx_t, 2, true>& outIndices,
         // Do we care about `outDistances`? If not, we can
         // take shortcuts.
         bool ignoreOutDistances = false);
@@ -90,7 +90,7 @@ void runL2Distance(
         Tensor<uint8_t, 1, true>& bitset,
         int k,
         Tensor<float, 2, true>& outDistances,
-        Tensor<int, 2, true>& outIndices,
+        Tensor<idx_t, 2, true>& outIndices,
         bool ignoreOutDistances = false);
 
 /// Calculates brute-force inner product distance between `vectors`
@@ -105,7 +105,7 @@ void runIPDistance(
         Tensor<uint8_t, 1, true>& bitset,
         int k,
         Tensor<float, 2, true>& outDistances,
-        Tensor<int, 2, true>& outIndices);
+        Tensor<idx_t, 2, true>& outIndices);
 
 void runIPDistance(
         GpuResources* resources,
@@ -117,7 +117,7 @@ void runIPDistance(
         Tensor<uint8_t, 1, true>& bitset,
         int k,
         Tensor<float, 2, true>& outDistances,
-        Tensor<int, 2, true>& outIndices);
+        Tensor<idx_t, 2, true>& outIndices);
 
 //
 // General distance implementation, assumes that all arguments are on the
@@ -232,6 +232,13 @@ void allPairwiseDistanceOnDevice(
                     outDistances,
                     JensenShannonDistance(),
                     stream);
+        } else if (metric == faiss::MetricType::METRIC_Jaccard) {
+            runGeneralDistanceKernel(
+                    tVectorsDimInnermost,
+                    tQueriesDimInnermost,
+                    outDistances,
+                    JaccardSimilarity(),
+                    stream);
         } else {
             FAISS_THROW_FMT("unimplemented metric type %d", metric);
         }
@@ -258,7 +265,7 @@ void bfKnnOnDevice(
         faiss::MetricType metric,
         float metricArg,
         Tensor<float, 2, true>& outDistances,
-        Tensor<int, 2, true>& outIndices,
+        Tensor<idx_t, 2, true>& outIndices,
         bool ignoreOutDistances) {
     DeviceScope ds(device);
     // We are guaranteed that all data arguments are resident on our preferred
@@ -387,6 +394,17 @@ void bfKnnOnDevice(
                     bitset,
                     k,
                     JensenShannonDistance(),
+                    outDistances,
+                    outIndices);
+        } else if (metric == faiss::MetricType::METRIC_Jaccard) {
+            runGeneralDistance(
+                    resources,
+                    stream,
+                    tVectorsDimInnermost,
+                    tQueriesDimInnermost,
+                    bitset,
+                    k,
+                    JaccardSimilarity(),
                     outDistances,
                     outIndices);
         } else {

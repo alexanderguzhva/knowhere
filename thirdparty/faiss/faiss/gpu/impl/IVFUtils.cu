@@ -11,7 +11,7 @@
 #include <thrust/scan.h>
 #include <faiss/gpu/impl/IVFUtils.cuh>
 #include <faiss/gpu/utils/Tensor.cuh>
-#include <faiss/gpu/utils/ThrustAllocator.cuh>
+#include <faiss/gpu/utils/ThrustUtils.cuh>
 
 #include <algorithm>
 
@@ -21,20 +21,20 @@ namespace gpu {
 // Calculates the total number of intermediate distances to consider
 // for all queries
 __global__ void getResultLengths(
-        Tensor<int, 2, true> topQueryToCentroid,
-        int* listLengths,
-        int totalSize,
-        Tensor<int, 2, true> length) {
-    int linearThreadId = blockIdx.x * blockDim.x + threadIdx.x;
+        Tensor<idx_t, 2, true> ivfListIds,
+        idx_t* listLengths,
+        idx_t totalSize,
+        Tensor<idx_t, 2, true> length) {
+    idx_t linearThreadId = idx_t(blockIdx.x) * blockDim.x + threadIdx.x;
     if (linearThreadId >= totalSize) {
         return;
     }
 
-    int nprobe = topQueryToCentroid.getSize(1);
-    int queryId = linearThreadId / nprobe;
-    int listId = linearThreadId % nprobe;
+    auto nprobe = ivfListIds.getSize(1);
+    auto queryId = linearThreadId / nprobe;
+    auto listId = linearThreadId % nprobe;
 
-    int centroidId = topQueryToCentroid[queryId][listId];
+    idx_t centroidId = ivfListIds[queryId][listId];
 
     // Safety guard in case NaNs in input cause no list ID to be generated
     length[queryId][listId] = (centroidId != -1) ? listLengths[centroidId] : 0;
@@ -42,34 +42,31 @@ __global__ void getResultLengths(
 
 void runCalcListOffsets(
         GpuResources* res,
-        Tensor<int, 2, true>& topQueryToCentroid,
-        thrust::device_vector<int>& listLengths,
-        Tensor<int, 2, true>& prefixSumOffsets,
+        Tensor<idx_t, 2, true>& ivfListIds,
+        DeviceVector<idx_t>& listLengths,
+        Tensor<idx_t, 2, true>& prefixSumOffsets,
         Tensor<char, 1, true>& thrustMem,
         cudaStream_t stream) {
-    FAISS_ASSERT(topQueryToCentroid.getSize(0) == prefixSumOffsets.getSize(0));
-    FAISS_ASSERT(topQueryToCentroid.getSize(1) == prefixSumOffsets.getSize(1));
+    FAISS_ASSERT(ivfListIds.getSize(0) == prefixSumOffsets.getSize(0));
+    FAISS_ASSERT(ivfListIds.getSize(1) == prefixSumOffsets.getSize(1));
 
-    int totalSize = topQueryToCentroid.numElements();
+    idx_t totalSize = ivfListIds.numElements();
 
-    int numThreads = std::min(totalSize, getMaxThreadsCurrentDevice());
-    int numBlocks = utils::divUp(totalSize, numThreads);
+    idx_t numThreads = std::min(totalSize, (idx_t)getMaxThreadsCurrentDevice());
+    idx_t numBlocks = utils::divUp(totalSize, numThreads);
 
     auto grid = dim3(numBlocks);
     auto block = dim3(numThreads);
 
     getResultLengths<<<grid, block, 0, stream>>>(
-            topQueryToCentroid,
-            listLengths.data().get(),
-            totalSize,
-            prefixSumOffsets);
+            ivfListIds, listLengths.data(), totalSize, prefixSumOffsets);
     CUDA_TEST_ERROR();
 
     // Prefix sum of the indices, so we know where the intermediate
     // results should be maintained
     // Thrust wants a place for its temporary allocations, so provide
     // one, so it won't call cudaMalloc/Free if we size it sufficiently
-    GpuResourcesThrustAllocator alloc(
+    ThrustAllocator alloc(
             res, stream, thrustMem.data(), thrustMem.getSizeInBytes());
 
     thrust::inclusive_scan(

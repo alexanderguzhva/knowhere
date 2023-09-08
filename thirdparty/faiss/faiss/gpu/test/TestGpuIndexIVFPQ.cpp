@@ -137,7 +137,58 @@ TEST(TestGpuIndexIVFPQ, Query_L2) {
         config.useFloat16LookupTables = opt.useFloat16;
 
         faiss::gpu::GpuIndexIVFPQ gpuIndex(&res, &cpuIndex, config);
-        gpuIndex.setNumProbes(opt.nprobe);
+        gpuIndex.nprobe = opt.nprobe;
+
+        faiss::gpu::compareIndices(
+                cpuIndex,
+                gpuIndex,
+                opt.numQuery,
+                opt.dim,
+                opt.k,
+                opt.toString(),
+                opt.getCompareEpsilon(),
+                opt.getPctMaxDiff1(),
+                opt.getPctMaxDiffN());
+    }
+}
+
+// Large batch sizes (>= 65536) should also work
+TEST(TestGpuIndexIVFPQ, LargeBatch) {
+    for (bool usePrecomputed : {false, true}) {
+        Options opt;
+
+        // override for large sizes
+        opt.dim = 4;
+        opt.numQuery = 100000;
+        opt.codes = 2;
+
+        std::vector<float> trainVecs =
+                faiss::gpu::randVecs(opt.numTrain, opt.dim);
+        std::vector<float> addVecs = faiss::gpu::randVecs(opt.numAdd, opt.dim);
+
+        faiss::IndexFlatL2 coarseQuantizer(opt.dim);
+        faiss::IndexIVFPQ cpuIndex(
+                &coarseQuantizer,
+                opt.dim,
+                opt.numCentroids,
+                opt.codes,
+                opt.bitsPerCode);
+        cpuIndex.nprobe = opt.nprobe;
+        cpuIndex.train(opt.numTrain, trainVecs.data());
+        cpuIndex.add(opt.numAdd, addVecs.data());
+
+        // Use the default temporary memory management to test the memory
+        // manager
+        faiss::gpu::StandardGpuResources res;
+
+        faiss::gpu::GpuIndexIVFPQConfig config;
+        config.device = opt.device;
+        config.usePrecomputedTables = usePrecomputed;
+        config.indicesOptions = opt.indicesOpt;
+        config.useFloat16LookupTables = false;
+
+        faiss::gpu::GpuIndexIVFPQ gpuIndex(&res, &cpuIndex, config);
+        gpuIndex.nprobe = opt.nprobe;
 
         faiss::gpu::compareIndices(
                 cpuIndex,
@@ -189,7 +240,7 @@ void testMMCodeDistance(faiss::MetricType mt) {
         config.flatConfig.useFloat16 = (tries % 2 == 1);
 
         faiss::gpu::GpuIndexIVFPQ gpuIndex(&res, &cpuIndex, config);
-        gpuIndex.setNumProbes(opt.nprobe);
+        gpuIndex.nprobe = opt.nprobe;
 
         faiss::gpu::compareIndices(
                 cpuIndex,
@@ -238,7 +289,7 @@ void testMMCodeDistance(faiss::MetricType mt) {
         config.useFloat16LookupTables = (dimPerSubQ == 7);
 
         faiss::gpu::GpuIndexIVFPQ gpuIndex(&res, &cpuIndex, config);
-        gpuIndex.setNumProbes(opt.nprobe);
+        gpuIndex.nprobe = opt.nprobe;
 
         faiss::gpu::compareIndices(
                 cpuIndex,
@@ -293,7 +344,7 @@ TEST(TestGpuIndexIVFPQ, Query_IP) {
         config.useFloat16LookupTables = opt.useFloat16;
 
         faiss::gpu::GpuIndexIVFPQ gpuIndex(&res, &cpuIndex, config);
-        gpuIndex.setNumProbes(opt.nprobe);
+        gpuIndex.nprobe = opt.nprobe;
 
         faiss::gpu::compareIndices(
                 cpuIndex,
@@ -335,7 +386,7 @@ TEST(TestGpuIndexIVFPQ, Float16Coarse) {
     config.useFloat16LookupTables = opt.useFloat16;
 
     faiss::gpu::GpuIndexIVFPQ gpuIndex(&res, &cpuIndex, config);
-    gpuIndex.setNumProbes(opt.nprobe);
+    gpuIndex.nprobe = opt.nprobe;
 
     gpuIndex.add(opt.numAdd, addVecs.data());
     cpuIndex.add(opt.numAdd, addVecs.data());
@@ -381,7 +432,7 @@ TEST(TestGpuIndexIVFPQ, Add_L2) {
         config.useFloat16LookupTables = opt.useFloat16;
 
         faiss::gpu::GpuIndexIVFPQ gpuIndex(&res, &cpuIndex, config);
-        gpuIndex.setNumProbes(opt.nprobe);
+        gpuIndex.nprobe = opt.nprobe;
 
         gpuIndex.add(opt.numAdd, addVecs.data());
         cpuIndex.add(opt.numAdd, addVecs.data());
@@ -429,7 +480,7 @@ TEST(TestGpuIndexIVFPQ, Add_IP) {
         config.useFloat16LookupTables = opt.useFloat16;
 
         faiss::gpu::GpuIndexIVFPQ gpuIndex(&res, &cpuIndex, config);
-        gpuIndex.setNumProbes(opt.nprobe);
+        gpuIndex.nprobe = opt.nprobe;
 
         gpuIndex.add(opt.numAdd, addVecs.data());
         cpuIndex.add(opt.numAdd, addVecs.data());
@@ -472,7 +523,7 @@ TEST(TestGpuIndexIVFPQ, CopyTo) {
                 opt.bitsPerCode,
                 faiss::METRIC_L2,
                 config);
-        gpuIndex.setNumProbes(opt.nprobe);
+        gpuIndex.nprobe = opt.nprobe;
         gpuIndex.train(opt.numTrain, trainVecs.data());
         gpuIndex.add(opt.numAdd, addVecs.data());
 
@@ -488,7 +539,7 @@ TEST(TestGpuIndexIVFPQ, CopyTo) {
         EXPECT_EQ(cpuIndex.d, gpuIndex.d);
         EXPECT_EQ(cpuIndex.d, opt.dim);
         EXPECT_EQ(cpuIndex.nlist, gpuIndex.getNumLists());
-        EXPECT_EQ(cpuIndex.nprobe, gpuIndex.getNumProbes());
+        EXPECT_EQ(cpuIndex.nprobe, gpuIndex.nprobe);
         EXPECT_EQ(cpuIndex.pq.M, gpuIndex.getNumSubQuantizers());
         EXPECT_EQ(gpuIndex.getNumSubQuantizers(), opt.codes);
         EXPECT_EQ(cpuIndex.pq.nbits, gpuIndex.getBitsPerCode());
@@ -538,7 +589,7 @@ TEST(TestGpuIndexIVFPQ, CopyFrom) {
     // Use garbage values to see if we overwrite them
     faiss::gpu::GpuIndexIVFPQ gpuIndex(
             &res, 1, 1, 1, 8, faiss::METRIC_L2, config);
-    gpuIndex.setNumProbes(1);
+    gpuIndex.nprobe = 1;
 
     gpuIndex.copyFrom(&cpuIndex);
 
@@ -549,7 +600,7 @@ TEST(TestGpuIndexIVFPQ, CopyFrom) {
     EXPECT_EQ(cpuIndex.d, gpuIndex.d);
     EXPECT_EQ(cpuIndex.d, opt.dim);
     EXPECT_EQ(cpuIndex.nlist, gpuIndex.getNumLists());
-    EXPECT_EQ(cpuIndex.nprobe, gpuIndex.getNumProbes());
+    EXPECT_EQ(cpuIndex.nprobe, gpuIndex.nprobe);
     EXPECT_EQ(cpuIndex.pq.M, gpuIndex.getNumSubQuantizers());
     EXPECT_EQ(gpuIndex.getNumSubQuantizers(), opt.codes);
     EXPECT_EQ(cpuIndex.pq.nbits, gpuIndex.getBitsPerCode());
@@ -594,7 +645,7 @@ TEST(TestGpuIndexIVFPQ, QueryNaN) {
             faiss::METRIC_L2,
             config);
 
-    gpuIndex.setNumProbes(opt.nprobe);
+    gpuIndex.nprobe = opt.nprobe;
 
     gpuIndex.train(opt.numTrain, trainVecs.data());
     gpuIndex.add(opt.numAdd, addVecs.data());
@@ -604,7 +655,7 @@ TEST(TestGpuIndexIVFPQ, QueryNaN) {
             numQuery * opt.dim, std::numeric_limits<float>::quiet_NaN());
 
     std::vector<float> distances(numQuery * opt.k, 0);
-    std::vector<faiss::Index::idx_t> indices(numQuery * opt.k, 0);
+    std::vector<faiss::idx_t> indices(numQuery * opt.k, 0);
 
     gpuIndex.search(
             numQuery, nans.data(), opt.k, distances.data(), indices.data());
@@ -640,7 +691,7 @@ TEST(TestGpuIndexIVFPQ, AddNaN) {
             faiss::METRIC_L2,
             config);
 
-    gpuIndex.setNumProbes(opt.nprobe);
+    gpuIndex.nprobe = opt.nprobe;
 
     int numNans = 10;
     std::vector<float> nans(
@@ -660,7 +711,7 @@ TEST(TestGpuIndexIVFPQ, AddNaN) {
 
     std::vector<float> queryVecs = faiss::gpu::randVecs(opt.numQuery, opt.dim);
     std::vector<float> distance(opt.numQuery * opt.k, 0);
-    std::vector<faiss::Index::idx_t> indices(opt.numQuery * opt.k, 0);
+    std::vector<faiss::idx_t> indices(opt.numQuery * opt.k, 0);
 
     // should not crash
     gpuIndex.search(
@@ -721,7 +772,7 @@ TEST(TestGpuIndexIVFPQ, UnifiedMemory) {
             faiss::METRIC_L2,
             config);
     gpuIndex.copyFrom(&cpuIndex);
-    gpuIndex.setNumProbes(nprobe);
+    gpuIndex.nprobe = nprobe;
 
     faiss::gpu::compareIndices(
             cpuIndex,
