@@ -62,7 +62,7 @@ void IndexRefine::reset() {
 
 namespace {
 
-typedef faiss::Index::idx_t idx_t;
+typedef faiss::idx_t idx_t;
 
 template <class C>
 static void reorder_2_heaps(
@@ -96,9 +96,10 @@ void IndexRefine::search(
         idx_t k,
         float* distances,
         idx_t* labels,
-        const BitsetView bitset) const {
+        const SearchParameters* params) const {
+    FAISS_THROW_IF_NOT_MSG(
+            !params, "search params not supported for this index");
     FAISS_THROW_IF_NOT(k > 0);
-
     FAISS_THROW_IF_NOT(is_trained);
     idx_t k_base = idx_t(k * k_factor);
     idx_t* base_labels = labels;
@@ -224,9 +225,10 @@ void IndexRefineFlat::search(
         idx_t k,
         float* distances,
         idx_t* labels,
-        const BitsetView bitset) const {
+        const SearchParameters* params) const {
+    FAISS_THROW_IF_NOT_MSG(
+            !params, "search params not supported for this index");
     FAISS_THROW_IF_NOT(k > 0);
-
     FAISS_THROW_IF_NOT(is_trained);
     idx_t k_base = idx_t(k * k_factor);
     idx_t* base_labels = labels;

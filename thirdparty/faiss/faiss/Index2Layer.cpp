@@ -24,6 +24,7 @@
 
 #include <faiss/FaissHook.h>
 #include <faiss/IndexIVFPQ.h>
+
 #include <faiss/IndexFlat.h>
 #include <faiss/impl/AuxIndexStructures.h>
 #include <faiss/impl/FaissAssert.h>
@@ -112,7 +113,7 @@ void Index2Layer::search(
         idx_t /*k*/,
         float* /*distances*/,
         idx_t* /*labels*/,
-        const BitsetView /*bitset*/) const {
+        const SearchParameters* /* params */) const {
     FAISS_THROW_MSG("not implemented");
 }
 
@@ -283,10 +284,13 @@ DistanceComputer* Index2Layer::get_distance_computer() const {
 
 /* The standalone codec interface */
 
+// block size used in Index2Layer::sa_encode
+int index2layer_sa_encode_bs = 32768;
+
 void Index2Layer::sa_encode(idx_t n, const float* x, uint8_t* bytes) const {
     FAISS_THROW_IF_NOT(is_trained);
 
-    idx_t bs = 32768;
+    idx_t bs = index2layer_sa_encode_bs;
     if (n > bs) {
         for (idx_t i0 = 0; i0 < n; i0 += bs) {
             idx_t i1 = std::min(i0 + bs, n);
@@ -335,6 +339,10 @@ void Index2Layer::sa_decode(idx_t n, const uint8_t* bytes, float* x) const {
             }
         }
     }
+}
+
+size_t Index2Layer::cal_size() const {
+    return sizeof(*this) + codes.size() * sizeof(uint8_t) + pq.cal_size();
 }
 
 } // namespace faiss
