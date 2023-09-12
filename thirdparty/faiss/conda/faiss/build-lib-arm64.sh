@@ -7,20 +7,16 @@
 set -e
 
 
-# Build libfaiss.so/libfaiss_avx2.so.
+# Build libfaiss.so
 cmake -B _build \
       -DBUILD_SHARED_LIBS=ON \
       -DBUILD_TESTING=OFF \
-      -DFAISS_OPT_LEVEL=avx2 \
-      -DFAISS_ENABLE_GPU=ON \
-      -DFAISS_ENABLE_RAFT=OFF \
-      -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHS}" \
+      -DFAISS_ENABLE_GPU=OFF \
       -DFAISS_ENABLE_PYTHON=OFF \
-      -DBLA_VENDOR=Intel10_64lp \
       -DCMAKE_INSTALL_LIBDIR=lib \
       -DCMAKE_BUILD_TYPE=Release .
 
-make -C _build -j$(nproc) faiss faiss_avx2
+make -C _build -j$(nproc) faiss
 
 cmake --install _build --prefix $PREFIX
 cmake --install _build --prefix _libfaiss_stage/

@@ -12,6 +12,9 @@ cmake -B _build_python_${PY_VER} \
       -Dfaiss_ROOT=_libfaiss_stage/ \
       -DFAISS_OPT_LEVEL=avx2 \
       -DFAISS_ENABLE_GPU=OFF \
+      -DOpenMP_CXX_FLAGS=-fopenmp=libiomp5 \
+      -DOpenMP_CXX_LIB_NAMES=libiomp5 \
+      -DOpenMP_libiomp5_LIBRARY=$PREFIX/lib/libiomp5.dylib \
       -DCMAKE_BUILD_TYPE=Release \
       -DPython_EXECUTABLE=$PYTHON \
       faiss/python
