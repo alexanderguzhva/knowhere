@@ -1,5 +1,9 @@
 set(FAISS_TEST_SRCS
-    ../../thirdparty/faiss/tests/test_omp_threads.cpp)
+    ../../thirdparty/faiss/tests/test_omp_threads.cpp
+    ../../thirdparty/faiss/tests/test_heap.cpp
+    ../../thirdparty/faiss/tests/test_partitioning.cpp
+    ../../thirdparty/faiss/tests/test_simdlib.cpp
+)
 
 find_package(GTest REQUIRED)
 
