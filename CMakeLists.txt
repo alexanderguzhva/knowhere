@@ -29,6 +29,7 @@ knowhere_option(WITH_BENCHMARK "Build with benchmark" OFF)
 knowhere_option(WITH_COVERAGE "Build with coverage" OFF)
 knowhere_option(WITH_CCACHE "Build with ccache" ON)
 knowhere_option(WITH_PROFILER "Build with profiler" OFF)
+knowhere_option(WITH_FAISS_TESTS "Build with Faiss unit tests" OFF)
 
 if(KNOWHERE_VERSION)
   message(STATUS "Building KNOWHERE version: ${KNOWHERE_VERSION}")
@@ -144,6 +145,10 @@ endif()
 
 if(WITH_BENCHMARK)
   add_subdirectory(benchmark)
+endif()
+
+if(WITH_FAISS_TESTS)
+  add_subdirectory(tests/faiss)
 endif()
 
 install(TARGETS knowhere
