@@ -50,16 +50,17 @@ struct IndexIVFFlat : IndexIVF {
             bool include_listnos = false) const override;
 
     InvertedListScanner* get_InvertedListScanner(
-            bool store_pairs) const override;
+            bool store_pairs,
+            const IDSelector* sel) const override;
 
     void reconstruct_from_offset(int64_t list_no, int64_t offset, float* recons)
             const override;
 
     void sa_decode(idx_t n, const uint8_t* bytes, float* x) const override;
 
-    IndexIVFFlat() {}
+    IndexIVFFlat();
 
-   protected:
+  protected:
     bool is_cosine_ = false;
 };
 
@@ -69,10 +70,10 @@ struct IndexIVFFlatCC : IndexIVFFlat {
             size_t d,
             size_t nlist,
             size_t ssize,
-            bool iscosine,
+            bool is_cosine,
             MetricType = METRIC_L2);
 
-    IndexIVFFlatCC() {}
+    IndexIVFFlatCC();
 };
 
 struct IndexIVFFlatDedup : IndexIVFFlat {
@@ -103,8 +104,7 @@ struct IndexIVFFlatDedup : IndexIVFFlat {
             idx_t* labels,
             bool store_pairs,
             const IVFSearchParameters* params = nullptr,
-            IndexIVFStats* stats = nullptr,
-            const BitsetView bitset = nullptr) const override;
+            IndexIVFStats* stats = nullptr) const override;
 
     size_t remove_ids(const IDSelector& sel) override;
 
@@ -114,7 +114,7 @@ struct IndexIVFFlatDedup : IndexIVFFlat {
             const float* x,
             float radius,
             RangeSearchResult* result,
-            const BitsetView bitset = nullptr) const override;
+            const SearchParameters* params = nullptr) const override;
 
     /// not implemented
     void update_vectors(int nv, const idx_t* idx, const float* v) override;

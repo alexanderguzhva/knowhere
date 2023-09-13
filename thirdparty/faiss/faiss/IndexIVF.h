@@ -231,6 +231,7 @@ struct IndexIVF : Index, IndexIVFInterface {
     virtual void add_core(
             idx_t n,
             const float* x,
+            // todo aguzhva: why norms, but not 1/norms ?
             const float* x_norms,
             const idx_t* xids,
             const idx_t* precomputed_idx);

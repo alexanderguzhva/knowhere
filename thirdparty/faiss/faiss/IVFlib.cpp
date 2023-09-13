@@ -10,6 +10,7 @@
 
 #include <memory>
 
+#include <faiss/FaissHook.h>
 #include <faiss/IndexAdditiveQuantizer.h>
 #include <faiss/IndexIVFAdditiveQuantizer.h>
 #include <faiss/IndexIVFIndependentQuantizer.h>
