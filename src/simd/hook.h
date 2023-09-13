@@ -25,6 +25,31 @@ extern void (*fvec_inner_products_ny)(float*, const float*, const float*, size_t
 extern void (*fvec_madd)(size_t, const float*, float, const float*, float*);
 extern int (*fvec_madd_and_argmin)(size_t, const float*, float, const float*, float*);
 
+extern void (*fvec_inner_product_batch_4)(
+        const float*,
+        const float*,
+        const float*,
+        const float*,
+        const float*,
+        const size_t,
+        float&,
+        float&,
+        float&,
+        float&);
+
+extern void (*fvec_L2sqr_batch_4)(
+        const float*,
+        const float*,
+        const float*,
+        const float*,
+        const float*,
+        const size_t,
+        float&,
+        float&,
+        float&,
+        float&);
+
+
 #if defined(__x86_64__)
 extern bool use_avx512;
 extern bool use_avx2;

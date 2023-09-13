@@ -82,6 +82,9 @@ fvec_hook(std::string& simd_type) {
         fvec_madd = fvec_madd_sse;
         fvec_madd_and_argmin = fvec_madd_and_argmin_sse;
 
+        fvec_inner_product_batch_4 = fvec_inner_product_batch_4_ref;
+        fvec_L2sqr_batch_4 = fvec_L2sqr_batch_4_ref;
+
         simd_type = "AVX512";
     } else if (use_avx2 && cpu_support_avx2()) {
         fvec_inner_product = fvec_inner_product_avx;
@@ -94,6 +97,9 @@ fvec_hook(std::string& simd_type) {
         fvec_inner_products_ny = fvec_inner_products_ny_sse;
         fvec_madd = fvec_madd_sse;
         fvec_madd_and_argmin = fvec_madd_and_argmin_sse;
+
+        fvec_inner_product_batch_4 = fvec_inner_product_batch_4_ref;
+        fvec_L2sqr_batch_4 = fvec_L2sqr_batch_4_ref;
 
         simd_type = "AVX2";
     } else if (use_sse4_2 && cpu_support_sse4_2()) {
@@ -108,6 +114,9 @@ fvec_hook(std::string& simd_type) {
         fvec_madd = fvec_madd_sse;
         fvec_madd_and_argmin = fvec_madd_and_argmin_sse;
 
+        fvec_inner_product_batch_4 = fvec_inner_product_batch_4_ref;
+        fvec_L2sqr_batch_4 = fvec_L2sqr_batch_4_ref;
+
         simd_type = "SSE4_2";
     } else {
         fvec_inner_product = fvec_inner_product_ref;
@@ -120,6 +129,9 @@ fvec_hook(std::string& simd_type) {
         fvec_inner_products_ny = fvec_inner_products_ny_ref;
         fvec_madd = fvec_madd_ref;
         fvec_madd_and_argmin = fvec_madd_and_argmin_ref;
+
+        fvec_inner_product_batch_4 = fvec_inner_product_batch_4_ref;
+        fvec_L2sqr_batch_4 = fvec_L2sqr_batch_4_ref;
 
         simd_type = "GENERIC";
     }

@@ -39,6 +39,38 @@ fvec_madd_ref(size_t n, const float* a, float bf, const float* b, float* c);
 int
 fvec_madd_and_argmin_ref(size_t n, const float* a, float bf, const float* b, float* c);
 
+/// Special version of inner product that computes 4 distances
+/// between x and yi, which is performance oriented.
+void 
+fvec_inner_product_batch_4_ref(
+        const float* x,
+        const float* y0,
+        const float* y1,
+        const float* y2,
+        const float* y3,
+        const size_t d,
+        float& dis0,
+        float& dis1,
+        float& dis2,
+        float& dis3);
+
+/// Special version of L2sqr that computes 4 distances
+/// between x and yi, which is performance oriented.
+void 
+fvec_L2sqr_batch_4_ref(
+        const float* x,
+        const float* y0,
+        const float* y1,
+        const float* y2,
+        const float* y3,
+        const size_t d,
+        float& dis0,
+        float& dis1,
+        float& dis2,
+        float& dis3);
+
+
+
 }  // namespace faiss
 
 #endif /* DISTANCES_REF_H */
