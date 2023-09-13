@@ -181,7 +181,7 @@ void IndexIVF::add(idx_t n, const float* x) {
 void IndexIVF::add_with_ids(idx_t n, const float* x, const idx_t* xids) {
     std::unique_ptr<idx_t[]> coarse_idx(new idx_t[n]);
     quantizer->assign(n, x, coarse_idx.get());
-    add_core(n, x, xids, coarse_idx.get());
+    add_core(n, x, nullptr, xids, coarse_idx.get());
 }
 
 void IndexIVF::add_sa_codes(idx_t n, const uint8_t* codes, const idx_t* xids) {
@@ -201,6 +201,7 @@ void IndexIVF::add_sa_codes(idx_t n, const uint8_t* codes, const idx_t* xids) {
 void IndexIVF::add_core(
         idx_t n,
         const float* x,
+        const float* x_norms,
         const idx_t* xids,
         const idx_t* coarse_idx) {
     // do some blocking to avoid excessive allocs
@@ -216,6 +217,7 @@ void IndexIVF::add_core(
             add_core(
                     i1 - i0,
                     x + i0 * d,
+                    (x_norms == nullptr) ? nullptr : (x_norms + i0),
                     xids ? xids + i0 : nullptr,
                     coarse_idx + i0);
         }
@@ -248,7 +250,7 @@ void IndexIVF::add_core(
             if (list_no >= 0 && list_no % nt == rank) {
                 idx_t id = xids ? xids[i] : ntotal + i;
                 size_t ofs = invlists->add_entry(
-                        list_no, id, flat_codes.get() + i * code_size);
+                        list_no, id, flat_codes.get() + i * code_size, (x_norms == nullptr) ? nullptr : x_norms + i);
 
                 dm_adder.add(i, list_no, ofs);
 
@@ -267,6 +269,19 @@ void IndexIVF::add_core(
     }
 
     ntotal += n;
+}
+
+void IndexIVF::to_readonly() {
+    if (is_readonly())
+        return;
+    auto readonly_lists = this->invlists->to_readonly();
+    if (!readonly_lists)
+        return;
+    this->replace_invlists(readonly_lists, true);
+}
+
+bool IndexIVF::is_readonly() const {
+    return this->invlists->is_readonly();
 }
 
 void IndexIVF::make_direct_map(bool b) {
@@ -516,6 +531,7 @@ void IndexIVF::search_preassigned(
             nlistv++;
 
             try {
+                // todo aguzhva: segments here
                 if (invlists->use_iterator) {
                     size_t list_size = 0;
 
@@ -807,6 +823,7 @@ void IndexIVF::range_search_preassigned(
             }
 
             try {
+                // todo aguzhva: segments here
                 size_t list_size = 0;
                 scanner->set_list(key, coarse_dis[i * nprobe + ik]);
                 if (invlists->use_iterator) {
@@ -1211,6 +1228,7 @@ size_t InvertedListScanner::scan_codes(
         float* simi,
         idx_t* idxi,
         size_t k) const {
+    // todo aguzhva: bitset should be here
     size_t nup = 0;
 
     if (!keep_max) {
@@ -1276,6 +1294,7 @@ void InvertedListScanner::scan_codes_range(
         const idx_t* ids,
         float radius,
         RangeQueryResult& res) const {
+    // todo aguzhva: bitset should be here
     for (size_t j = 0; j < list_size; j++) {
         float dis = distance_to_code(codes);
         bool keep = !keep_max
