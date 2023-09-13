@@ -9,13 +9,13 @@
 #include <faiss/impl/ScalarQuantizer.h>
 #include "simd/hook.h"
 namespace faiss {
-typedef SQDistanceComputer* (*sq_get_distance_computer_func_ptr)(
+typedef ScalarQuantizer::SQDistanceComputer* (*sq_get_distance_computer_func_ptr)(
         MetricType,
-        QuantizerType,
+        ScalarQuantizer::QuantizerType,
         size_t,
         const std::vector<float>&);
 typedef Quantizer* (*sq_sel_quantizer_func_ptr)(
-        QuantizerType,
+        ScalarQuantizer::QuantizerType,
         size_t,
         const std::vector<float>&);
 typedef InvertedListScanner* (*sq_sel_inv_list_scanner_func_ptr)(

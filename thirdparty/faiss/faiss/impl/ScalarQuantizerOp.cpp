@@ -8,16 +8,13 @@
 #include <cstdio>
 #include <algorithm>
 
-#ifdef __SSE__
-#include <immintrin.h>
-#endif
-
-#include <faiss/utils/fp16.h>
-#include <faiss/utils/utils.h>
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/impl/ScalarQuantizerOp.h>
+#include <faiss/utils/utils.h>
 
 namespace faiss {
+
+using RangeStat = ScalarQuantizer::RangeStat;
 
 /*******************************************************************
  * Quantizer range training
