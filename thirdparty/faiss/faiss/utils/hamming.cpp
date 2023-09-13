@@ -26,24 +26,36 @@
 
 #include <faiss/utils/hamming.h>
 
-#include <math.h>
-#include <omp.h>
-#include <stdio.h>
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <memory>
 #include <vector>
 
 #include <faiss/impl/AuxIndexStructures.h>
 #include <faiss/impl/FaissAssert.h>
+#include <faiss/impl/IDSelector.h>
 #include <faiss/utils/Heap.h>
 #include <faiss/utils/utils.h>
 
 static const size_t BLOCKSIZE_QUERY = 8192;
-static const size_t size_1M = 1 * 1024 * 1024;
 
 namespace faiss {
 
 size_t hamming_batch_size = 65536;
+
+const uint8_t hamdis_tab_ham_bytes[256] = {
+        0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 1, 2, 2, 3, 2, 3, 3, 4,
+        2, 3, 3, 4, 3, 4, 4, 5, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 1, 2, 2, 3, 2, 3, 3, 4,
+        2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6,
+        4, 5, 5, 6, 5, 6, 6, 7, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 2, 3, 3, 4, 3, 4, 4, 5,
+        3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6,
+        4, 5, 5, 6, 5, 6, 6, 7, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8};
 
 /* Elementary Hamming distance computation: unoptimized  */
 template <size_t nbits, typename T>
@@ -52,7 +64,7 @@ T hamming(const uint8_t* bs1, const uint8_t* bs2) {
     size_t i;
     T h = 0;
     for (i = 0; i < nbytes; i++)
-        h += (T)lookup8bit[bs1[i] ^ bs2[i]];
+        h += (T)hamdis_tab_ham_bytes[bs1[i] ^ bs2[i]];
     return h;
 }
 
@@ -214,6 +226,138 @@ size_t match_hamming_thres(
     return posm;
 }
 
+/* Return closest neighbors w.r.t Hamming distance, using a heap. */
+template <class HammingComputer>
+static void hammings_knn_hc(
+        int bytes_per_code,
+        int_maxheap_array_t* ha,
+        const uint8_t* bs1,
+        const uint8_t* bs2,
+        size_t n2,
+        bool order = true,
+        bool init_heap = true) {
+    size_t k = ha->k;
+    if (init_heap)
+        ha->heapify();
+
+    const size_t block_size = hamming_batch_size;
+    for (size_t j0 = 0; j0 < n2; j0 += block_size) {
+        const size_t j1 = std::min(j0 + block_size, n2);
+#pragma omp parallel for
+        for (int64_t i = 0; i < ha->nh; i++) {
+            HammingComputer hc(bs1 + i * bytes_per_code, bytes_per_code);
+
+            const uint8_t* bs2_ = bs2 + j0 * bytes_per_code;
+            hamdis_t dis;
+            hamdis_t* __restrict bh_val_ = ha->val + i * k;
+            int64_t* __restrict bh_ids_ = ha->ids + i * k;
+            size_t j;
+            for (j = j0; j < j1; j++, bs2_ += bytes_per_code) {
+                dis = hc.hamming(bs2_);
+                if (dis < bh_val_[0]) {
+                    faiss::maxheap_replace_top<hamdis_t>(
+                            k, bh_val_, bh_ids_, dis, j);
+                }
+            }
+        }
+    }
+    if (order)
+        ha->reorder();
+}
+
+/* Return closest neighbors w.r.t Hamming distance, using max count. */
+template <class HammingComputer>
+static void hammings_knn_mc(
+        int bytes_per_code,
+        const uint8_t* a,
+        const uint8_t* b,
+        size_t na,
+        size_t nb,
+        size_t k,
+        int32_t* distances,
+        int64_t* labels) {
+    const int nBuckets = bytes_per_code * 8 + 1;
+    std::vector<int> all_counters(na * nBuckets, 0);
+    std::unique_ptr<int64_t[]> all_ids_per_dis(new int64_t[na * nBuckets * k]);
+
+    std::vector<HCounterState<HammingComputer>> cs;
+    for (size_t i = 0; i < na; ++i) {
+        cs.push_back(HCounterState<HammingComputer>(
+                all_counters.data() + i * nBuckets,
+                all_ids_per_dis.get() + i * nBuckets * k,
+                a + i * bytes_per_code,
+                8 * bytes_per_code,
+                k));
+    }
+
+    const size_t block_size = hamming_batch_size;
+    for (size_t j0 = 0; j0 < nb; j0 += block_size) {
+        const size_t j1 = std::min(j0 + block_size, nb);
+#pragma omp parallel for
+        for (int64_t i = 0; i < na; ++i) {
+            for (size_t j = j0; j < j1; ++j) {
+                cs[i].update_counter(b + j * bytes_per_code, j);
+            }
+        }
+    }
+
+    for (size_t i = 0; i < na; ++i) {
+        HCounterState<HammingComputer>& csi = cs[i];
+
+        int nres = 0;
+        for (int b = 0; b < nBuckets && nres < k; b++) {
+            for (int l = 0; l < csi.counters[b] && nres < k; l++) {
+                labels[i * k + nres] = csi.ids_per_dis[b * k + l];
+                distances[i * k + nres] = b;
+                nres++;
+            }
+        }
+        while (nres < k) {
+            labels[i * k + nres] = -1;
+            distances[i * k + nres] = std::numeric_limits<int32_t>::max();
+            ++nres;
+        }
+    }
+}
+
+// works faster than the template version
+static void hammings_knn_hc_1(
+        int_maxheap_array_t* ha,
+        const uint64_t* bs1,
+        const uint64_t* bs2,
+        size_t n2,
+        bool order = true,
+        bool init_heap = true) {
+    const size_t nwords = 1;
+    size_t k = ha->k;
+
+    if (init_heap) {
+        ha->heapify();
+    }
+
+#pragma omp parallel for
+    for (int64_t i = 0; i < ha->nh; i++) {
+        const uint64_t bs1_ = bs1[i];
+        const uint64_t* bs2_ = bs2;
+        hamdis_t dis;
+        hamdis_t* bh_val_ = ha->val + i * k;
+        hamdis_t bh_val_0 = bh_val_[0];
+        int64_t* bh_ids_ = ha->ids + i * k;
+        size_t j;
+        for (j = 0; j < n2; j++, bs2_ += nwords) {
+            dis = popcount64(bs1_ ^ *bs2_);
+            if (dis < bh_val_0) {
+                faiss::maxheap_replace_top<hamdis_t>(
+                        k, bh_val_, bh_ids_, dis, j);
+                bh_val_0 = bh_val_[0];
+            }
+        }
+    }
+    if (order) {
+        ha->reorder();
+    }
+}
+
 /* Functions to maps vectors to bits. Assume proper allocation done beforehand,
    meaning that b should be be able to receive as many bits as x may produce. */
 
@@ -338,6 +482,82 @@ void hammings(
     }
 }
 
+void hammings_knn(
+        int_maxheap_array_t* ha,
+        const uint8_t* a,
+        const uint8_t* b,
+        size_t nb,
+        size_t ncodes,
+        int order) {
+    hammings_knn_hc(ha, a, b, nb, ncodes, order);
+}
+
+void hammings_knn_hc(
+        int_maxheap_array_t* ha,
+        const uint8_t* a,
+        const uint8_t* b,
+        size_t nb,
+        size_t ncodes,
+        int order) {
+    switch (ncodes) {
+        case 4:
+            hammings_knn_hc<faiss::HammingComputer4>(
+                    4, ha, a, b, nb, order, true);
+            break;
+        case 8:
+            hammings_knn_hc_1(ha, C64(a), C64(b), nb, order, true);
+            // hammings_knn_hc<faiss::HammingComputer8>
+            //      (8, ha, a, b, nb, order, true);
+            break;
+        case 16:
+            hammings_knn_hc<faiss::HammingComputer16>(
+                    16, ha, a, b, nb, order, true);
+            break;
+        case 32:
+            hammings_knn_hc<faiss::HammingComputer32>(
+                    32, ha, a, b, nb, order, true);
+            break;
+        default:
+            hammings_knn_hc<faiss::HammingComputerDefault>(
+                    ncodes, ha, a, b, nb, order, true);
+            break;
+    }
+}
+
+void hammings_knn_mc(
+        const uint8_t* a,
+        const uint8_t* b,
+        size_t na,
+        size_t nb,
+        size_t k,
+        size_t ncodes,
+        int32_t* distances,
+        int64_t* labels) {
+    switch (ncodes) {
+        case 4:
+            hammings_knn_mc<faiss::HammingComputer4>(
+                    4, a, b, na, nb, k, distances, labels);
+            break;
+        case 8:
+            // TODO(hoss): Write analog to hammings_knn_hc_1
+            // hammings_knn_hc_1 (ha, C64(a), C64(b), nb, order, true);
+            hammings_knn_mc<faiss::HammingComputer8>(
+                    8, a, b, na, nb, k, distances, labels);
+            break;
+        case 16:
+            hammings_knn_mc<faiss::HammingComputer16>(
+                    16, a, b, na, nb, k, distances, labels);
+            break;
+        case 32:
+            hammings_knn_mc<faiss::HammingComputer32>(
+                    32, a, b, na, nb, k, distances, labels);
+            break;
+        default:
+            hammings_knn_mc<faiss::HammingComputerDefault>(
+                    ncodes, a, b, na, nb, k, distances, labels);
+            break;
+    }
+}
 template <class HammingComputer>
 static void hamming_range_search_template(
         const uint8_t* a,
@@ -347,7 +567,7 @@ static void hamming_range_search_template(
         int radius,
         size_t code_size,
         RangeSearchResult* res,
-        const BitsetView bitset = nullptr) {
+        const IDSelector* sel = nullptr) {
 #pragma omp parallel
     {
         RangeSearchPartialResult pres(res);
@@ -359,8 +579,10 @@ static void hamming_range_search_template(
             RangeQueryResult& qres = pres.new_result(i);
 
             for (size_t j = 0; j < nb; j++) {
-                if (bitset.empty() || !bitset.test(j)) {
-                    int dis = hc.compute(yi);
+                // todo aguzhva: bitset
+                // if (bitset.empty() || !bitset.test(j)) {
+                if (sel && sel->is_member(j)) {
+                    int dis = hc.hamming(yi);
                     if (dis < radius) {
                         qres.add(dis, j);
                     }
@@ -380,10 +602,9 @@ void hamming_range_search(
         int radius,
         size_t code_size,
         RangeSearchResult* result,
-        const BitsetView bitset = nullptr) {
-#define HC(name)                         \
-    hamming_range_search_template<name>( \
-            a, b, na, nb, radius, code_size, result, bitset)
+        const IDSelector* sel = nullptr) {
+#define HC(name) \
+    hamming_range_search_template<name>(a, b, na, nb, radius, code_size, result, sel)
 
     switch (code_size) {
         case 4:
@@ -508,7 +729,7 @@ static void hamming_dis_inner_loop(
     HammingComputer hc(ca, code_size);
 
     for (size_t j = 0; j < nb; j++) {
-        int ndiff = hc.compute(cb);
+        int ndiff = hc.hamming(cb);
         cb += code_size;
         if (ndiff < bh_val_[0]) {
             maxheap_replace_top<hamdis_t>(k, bh_val_, bh_ids_, ndiff, j);

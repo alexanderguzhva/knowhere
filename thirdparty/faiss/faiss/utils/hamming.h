@@ -26,16 +26,16 @@
 
 #include <stdint.h>
 
-#include <faiss/impl/AuxIndexStructures.h>
 #include <faiss/impl/platform_macros.h>
 #include <faiss/utils/Heap.h>
-#include <knowhere/bitsetview.h>
 
 /* The Hamming distance type */
 typedef int32_t hamdis_t;
 
 namespace faiss {
-extern uint8_t lookup8bit[256];
+
+struct IDSelector;
+
 /**************************************************
  * General bit vector functions
  **************************************************/
@@ -175,9 +175,8 @@ void hamming_range_search(
         size_t nb,
         int radius,
         size_t ncodes,
-        std::vector<faiss::RangeSearchPartialResult*>& result,
-        size_t buffer_size,
-        const BitsetView bitset = nullptr);
+        RangeSearchResult* result,
+        const IDSelector* sel = nullptr);
 
 /* Counting the number of matches or of cross-matches (without returning them)
    For use with function that assume pre-allocated memory */
