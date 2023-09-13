@@ -34,8 +34,6 @@ inline uint64_t lo_offset(uint64_t lo) {
  * Direct map: a way to map back from ids to inverted lists
  */
 struct DirectMap {
-    typedef Index::idx_t idx_t;
-
     enum Type {
         NoMap = 0,    // default
         Array = 1,    // sequential ids (only for add, no add_with_ids)
@@ -91,8 +89,6 @@ struct DirectMap {
 
 /// Thread-safe way of updating the direct_map
 struct DirectMapAdd {
-    typedef Index::idx_t idx_t;
-
     using Type = DirectMap::Type;
 
     DirectMap& direct_map;

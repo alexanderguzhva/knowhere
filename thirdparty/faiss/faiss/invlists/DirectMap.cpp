@@ -48,18 +48,18 @@ void DirectMap::set_type(
         for (size_t segment_idx = 0; segment_idx < segment_num; segment_idx++) {
             size_t segment_size = invlists->get_segment_size(key, segment_idx);
             size_t segment_offset = invlists->get_segment_offset(key, segment_idx);
-            InvertedLists::ScopedIds idlist(invlists, key, segment_offset);
-            if (new_type == Array) {
-                for (long ofs = 0; ofs < segment_size; ofs++) {
-                    FAISS_THROW_IF_NOT_MSG(
-                            0 <= idlist[ofs] && idlist[ofs] < ntotal,
-                            "direct map supported only for seuquential ids");
-                    array[idlist[ofs]] = lo_build(key, segment_offset + ofs);
-                }
-            } else if (new_type == Hashtable) {
-                for (long ofs = 0; ofs < segment_size; ofs++) {
-                    hashtable[idlist[ofs]] = lo_build(key, segment_offset + ofs);
-                }
+        InvertedLists::ScopedIds idlist(invlists, key, segment_offset);
+        if (new_type == Array) {
+            for (long ofs = 0; ofs < segment_size; ofs++) {
+                FAISS_THROW_IF_NOT_MSG(
+                        0 <= idlist[ofs] && idlist[ofs] < ntotal,
+                        "direct map supported only for seuquential ids");
+                array[idlist[ofs]] = lo_build(key, segment_offset + ofs);
+            }
+        } else if (new_type == Hashtable) {
+            for (long ofs = 0; ofs < segment_size; ofs++) {
+                hashtable[idlist[ofs]] = lo_build(key, segment_offset + ofs);
+            }
             }
         }
     }
@@ -70,7 +70,7 @@ void DirectMap::clear() {
     hashtable.clear();
 }
 
-DirectMap::idx_t DirectMap::get(idx_t key) const {
+idx_t DirectMap::get(idx_t key) const {
     if (type == Array) {
         FAISS_THROW_IF_NOT_MSG(key >= 0 && key < array.size(), "invalid key");
         idx_t lo = array[key];
