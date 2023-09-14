@@ -81,7 +81,7 @@ void knn_extra_metrics_template(
             for (j = 0; j < ny; j++) {
                 // todo aguzhva: bitset here
                 // if (bitset.empty() || !bitset.test(j)) {
-                if (sel && sel->is_member(j)) {
+                if (!sel || sel->is_member(j)) {
                     float disij = vd(x_i, y_j);
 
                     // if (disij < simi[0]) {

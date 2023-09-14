@@ -19,7 +19,6 @@ template <class DCClass, int use_sel>
 struct IVFSQScannerIP : InvertedListScanner {
     DCClass dc;
     bool by_residual;
-    const IDSelector* sel;
 
     float accu0; /// added to all distances
 
@@ -30,8 +29,9 @@ struct IVFSQScannerIP : InvertedListScanner {
             bool store_pairs,
             const IDSelector* sel,
             bool by_residual)
-            : dc(d, trained), by_residual(by_residual), sel(sel), accu0(0) {
+            : dc(d, trained), by_residual(by_residual), accu0(0) {
         this->store_pairs = store_pairs;
+        this->sel = sel;
         this->code_size = code_size;
     }
 
@@ -51,6 +51,7 @@ struct IVFSQScannerIP : InvertedListScanner {
     size_t scan_codes(
             size_t list_size,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float* simi,
             idx_t* idxi,
@@ -65,7 +66,7 @@ struct IVFSQScannerIP : InvertedListScanner {
             float accu = accu0 + dc.query_to_code(codes);
 
             if (accu > simi[0]) {
-                int64_t id = store_pairs ? (list_no << 32 | j) : ids[j];
+                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
                 minheap_replace_top(k, simi, idxi, accu, id);
                 nup++;
             }
@@ -76,6 +77,7 @@ struct IVFSQScannerIP : InvertedListScanner {
     void scan_codes_range(
             size_t list_size,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float radius,
             RangeQueryResult& res) const override {
@@ -86,7 +88,7 @@ struct IVFSQScannerIP : InvertedListScanner {
 
             float accu = accu0 + dc.query_to_code(codes);
             if (accu > radius) {
-                int64_t id = store_pairs ? (list_no << 32 | j) : ids[j];
+                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
                 res.add(accu, id);
             }
         }
@@ -103,7 +105,6 @@ struct IVFSQScannerL2 : InvertedListScanner {
 
     bool by_residual;
     const Index* quantizer;
-    const IDSelector* sel;
     const float* x; /// current query
 
     std::vector<float> tmp;
@@ -119,10 +120,10 @@ struct IVFSQScannerL2 : InvertedListScanner {
             : dc(d, trained),
               by_residual(by_residual),
               quantizer(quantizer),
-              sel(sel),
               x(nullptr),
               tmp(d) {
         this->store_pairs = store_pairs;
+        this->sel = sel;
         this->code_size = code_size;
     }
 
@@ -151,6 +152,7 @@ struct IVFSQScannerL2 : InvertedListScanner {
     size_t scan_codes(
             size_t list_size,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float* simi,
             idx_t* idxi,
@@ -175,6 +177,7 @@ struct IVFSQScannerL2 : InvertedListScanner {
     void scan_codes_range(
             size_t list_size,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float radius,
             RangeQueryResult& res) const override {

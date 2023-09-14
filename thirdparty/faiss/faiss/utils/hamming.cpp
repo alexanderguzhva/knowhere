@@ -310,7 +310,7 @@ void hamming_range_search(
             for (size_t j = 0; j < nb; j++) {
                 // todo aguzhva: bitset
                 // if (bitset.empty() || !bitset.test(j)) {
-                if (sel && sel->is_member(j)) {
+                if (!sel || sel->is_member(j)) {
                     int dis = hc.hamming(yi);
                     if (dis < radius) {
                         qres.add(dis, j);

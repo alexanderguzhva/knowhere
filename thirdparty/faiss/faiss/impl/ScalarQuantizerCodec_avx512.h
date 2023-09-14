@@ -433,6 +433,8 @@ struct DCTemplate_avx512<Quantizer, Similarity, 16> : SQDistanceComputer {
     float query_to_code(const uint8_t * code) const override final {
         return compute_distance(q, code);
     }
+
+    // todo aguzhva: introduce distances_batch_4()
 };
 
 /*******************************************************************

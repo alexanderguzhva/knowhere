@@ -33,6 +33,40 @@ fvec_L2sqr_ny_ref(float* dis, const float* x, const float* y, size_t d, size_t n
 void
 fvec_inner_products_ny_ref(float* ip, const float* x, const float* y, size_t d, size_t ny);
 
+/// compute ny square L2 distance between x and a set of transposed contiguous
+/// y vectors. squared lengths of y should be provided as well
+void fvec_L2sqr_ny_transposed_ref(
+        float* dis,
+        const float* x,
+        const float* y,
+        const float* y_sqlen,
+        size_t d,
+        size_t d_offset,
+        size_t ny);
+
+/// compute ny square L2 distance between x and a set of contiguous y vectors
+/// and return the index of the nearest vector.
+/// return 0 if ny == 0.
+size_t fvec_L2sqr_ny_nearest_ref(
+        float* distances_tmp_buffer,
+        const float* x,
+        const float* y,
+        size_t d,
+        size_t ny);
+
+/// compute ny square L2 distance between x and a set of transposed contiguous
+/// y vectors and return the index of the nearest vector.
+/// squared lengths of y should be provided as well
+/// return 0 if ny == 0.
+size_t fvec_L2sqr_ny_nearest_y_transposed_ref(
+        float* distances_tmp_buffer,
+        const float* x,
+        const float* y,
+        const float* y_sqlen,
+        size_t d,
+        size_t d_offset,
+        size_t ny);
+
 void
 fvec_madd_ref(size_t n, const float* a, float bf, const float* b, float* c);
 

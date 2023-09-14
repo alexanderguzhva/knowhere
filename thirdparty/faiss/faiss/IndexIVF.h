@@ -472,6 +472,7 @@ struct InvertedListScanner {
     virtual size_t scan_codes(
             size_t n,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float* distances,
             idx_t* labels,
@@ -492,6 +493,7 @@ struct InvertedListScanner {
     virtual void scan_codes_range(
             size_t n,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float radius,
             RangeQueryResult& result) const;

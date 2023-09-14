@@ -238,6 +238,8 @@ struct Quantizer8bitDirect<1> : SQuantizer {
     float reconstruct_component(const uint8_t* code, int i) const {
         return code[i];
     }
+
+    // todo aguzhva: introduce distances_batch_4()
 };
 
 template <int SIMDWIDTH>

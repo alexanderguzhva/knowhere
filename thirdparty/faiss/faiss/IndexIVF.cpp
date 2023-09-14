@@ -1224,30 +1224,46 @@ IndexIVFStats indexIVF_stats;
 size_t InvertedListScanner::scan_codes(
         size_t list_size,
         const uint8_t* codes,
+        const float* code_norms,
         const idx_t* ids,
         float* simi,
         idx_t* idxi,
         size_t k) const {
-    // todo aguzhva: bitset should be here
     size_t nup = 0;
 
     if (!keep_max) {
         for (size_t j = 0; j < list_size; j++) {
-            float dis = distance_to_code(codes);
-            if (dis < simi[0]) {
-                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
-                maxheap_replace_top(k, simi, idxi, dis, id);
-                nup++;
+            // // todo aguzhva: bitset was here
+            // if (bitset.empty() || !bitset.test(j)) {
+            // // todo aguzhva: use int64_t id instead of j ?
+            if (!sel || sel->is_member(j)) {
+                float dis = distance_to_code(codes);
+                if (code_norms) {
+                    dis /= code_norms[j];
+                }
+                if (dis < simi[0]) {
+                    int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
+                    maxheap_replace_top(k, simi, idxi, dis, id);
+                    nup++;
+                }
             }
             codes += code_size;
         }
     } else {
         for (size_t j = 0; j < list_size; j++) {
-            float dis = distance_to_code(codes);
-            if (dis > simi[0]) {
-                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
-                minheap_replace_top(k, simi, idxi, dis, id);
-                nup++;
+            // // todo aguzhva: bitset was here
+            // if (bitset.empty() || !bitset.test(j)) {
+            // // todo aguzhva: use int64_t id instead of j ?
+            if (!sel || sel->is_member(j)) {
+                float dis = distance_to_code(codes);
+                if (code_norms) {
+                    dis /= code_norms[j];
+                }
+                if (dis > simi[0]) {
+                    int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
+                    minheap_replace_top(k, simi, idxi, dis, id);
+                    nup++;
+                }
             }
             codes += code_size;
         }
@@ -1291,18 +1307,27 @@ size_t InvertedListScanner::iterate_codes(
 void InvertedListScanner::scan_codes_range(
         size_t list_size,
         const uint8_t* codes,
+        const float* code_norms,
         const idx_t* ids,
         float radius,
         RangeQueryResult& res) const {
-    // todo aguzhva: bitset should be here
     for (size_t j = 0; j < list_size; j++) {
-        float dis = distance_to_code(codes);
-        bool keep = !keep_max
-                ? dis < radius
-                : dis > radius; // TODO templatize to remove this test
-        if (keep) {
-            int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
-            res.add(dis, id);
+        // // todo aguzhva: bitset was here
+        // if (bitset.empty() || !bitset.test(j)) {
+        // // todo aguzhva: use int64_t id instead of j ?
+        if (!sel || sel->is_member(j)) {
+            float dis = distance_to_code(codes);
+            // // todo aguzhva: use int64_t id instead of j ?
+            if (code_norms) {
+                dis /= code_norms[j];
+            }
+            bool keep = !keep_max
+                    ? dis < radius
+                    : dis > radius; // TODO templatize to remove this test
+            if (keep) {
+                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
+                res.add(dis, id);
+            }
         }
         codes += code_size;
     }

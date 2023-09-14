@@ -473,6 +473,8 @@ struct DistanceComputerByte_avx<Similarity, 8> : SQDistanceComputer {
     float query_to_code(const uint8_t* code) const override final {
         return compute_code_distance(tmp.data(), code);
     }
+
+    // todo aguzhva: introduce distances_batch_4()
 };
 
 /*******************************************************************
