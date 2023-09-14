@@ -186,7 +186,7 @@ void knn_extra_metrics(
         MetricType mt,
         float metric_arg,
         HeapArray<C>* res,
-        const IDSelector* sel = nullptr) {
+        const IDSelector* sel) {
     switch (mt) {
 #define HANDLE_VAR(kw)                                            \
     case METRIC_##kw: {                                           \

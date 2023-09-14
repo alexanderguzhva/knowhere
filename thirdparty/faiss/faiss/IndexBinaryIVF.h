@@ -32,29 +32,36 @@ struct BinaryInvertedListScanner;
  */
 struct IndexBinaryIVF : IndexBinary {
     /// Access to the actual data
-    InvertedLists* invlists;
-    bool own_invlists;
+    InvertedLists* invlists = nullptr;
+    bool own_invlists = true;
 
-    size_t nprobe;    ///< number of probes at query time
-    size_t max_codes; ///< max nb of codes to visit to do a query
+    size_t nprobe = 1;    ///< number of probes at query time
+    size_t max_codes = 0; ///< max nb of codes to visit to do a query
 
     /** Select between using a heap or counting to select the k smallest values
      * when scanning inverted lists.
      */
     bool use_heap = true;
 
+    /** collect computations per batch */
+    bool per_invlist_search = false;
+
     /// map for direct access to the elements. Enables reconstruct().
     DirectMap direct_map;
 
-    IndexBinary* quantizer; ///< quantizer that maps vectors to inverted lists
-    size_t nlist;           ///< number of possible key values
+    /// quantizer that maps vectors to inverted lists
+    IndexBinary* quantizer = nullptr;
 
-    bool own_fields; ///< whether object owns the quantizer
+    /// number of possible key values
+    size_t nlist = 0;
+
+    /// whether object owns the quantizer
+    bool own_fields = false;
 
     ClusteringParameters cp; ///< to override default clustering params
-    Index* clustering_index; ///< to override index used during clustering
-    // mutable std::vector<size_t> nprobe_statistics;
-    // mutable IndexIVFStats index_ivf_stats;
+
+    /// to override index used during clustering
+    Index* clustering_index = nullptr;
 
     /** The Inverted file takes a quantizer (an IndexBinary) on input,
      * which implements the function mapping a vector to a list
@@ -120,8 +127,7 @@ struct IndexBinaryIVF : IndexBinary {
             int32_t* distances,
             idx_t* labels,
             bool store_pairs,
-            const IVFSearchParameters* params = nullptr,
-            const BitsetView bitset = nullptr) const;
+            const IVFSearchParameters* params = nullptr) const;
 
     virtual BinaryInvertedListScanner* get_InvertedListScanner(
             bool store_pairs = false) const;
@@ -133,7 +139,7 @@ struct IndexBinaryIVF : IndexBinary {
             idx_t k,
             int32_t* distances,
             idx_t* labels,
-            const BitsetView bitset = nullptr) const override;
+            const SearchParameters* params = nullptr) const override;
 
     void search_thread_safe(
             idx_t n,
@@ -142,32 +148,23 @@ struct IndexBinaryIVF : IndexBinary {
             int32_t* distances,
             idx_t* labels,
             size_t nprobe,
-            const BitsetView bitset) const;
+            const SearchParameters* params = nullptr) const;
 
     void range_search(
             idx_t n,
             const uint8_t* x,
-            float radius,
+            int radius,
             RangeSearchResult* result,
-            const BitsetView bitset = nullptr) const override;
-
-    void search_and_reconstruct_thread_safe(
-            idx_t n,
-            const uint8_t* x,
-            idx_t k,
-            int32_t* distances,
-            idx_t* labels,
-            uint8_t* recons,
-            size_t nprobe) const;
+            const SearchParameters* params = nullptr) const override;
 
     void range_search_preassigned(
             idx_t n,
             const uint8_t* x,
-            float radius,
+            int radius,
             const idx_t* assign,
             const int32_t* centroid_dis,
             RangeSearchResult* result,
-            const BitsetView bitset = nullptr) const;
+            const SearchParameters* params = nullptr) const;
 
     void reconstruct(idx_t key, uint8_t* recons) const override;
 
@@ -197,7 +194,18 @@ struct IndexBinaryIVF : IndexBinary {
             idx_t k,
             int32_t* distances,
             idx_t* labels,
-            uint8_t* recons) const override;
+            uint8_t* recons,
+            const SearchParameters* params = nullptr) const override;
+
+    void search_and_reconstruct_thread_safe(
+            idx_t n,
+            const uint8_t* x,
+            idx_t k,
+            int32_t* distances,
+            idx_t* labels,
+            uint8_t* recons,
+            size_t nprobe,
+            const SearchParameters* params = nullptr) const;
 
     /** Reconstruct a vector given the location in terms of (inv list index +
      * inv list offset) instead of the id.
@@ -214,16 +222,16 @@ struct IndexBinaryIVF : IndexBinary {
     /// Dataset manipulation functions
     size_t remove_ids(const IDSelector& sel) override;
 
-    /** moves the entries from another dataset to self. On output,
-     * other is empty. add_id is added to all moved ids (for
-     * sequential ids, this would be this->ntotal */
-    virtual void merge_from(IndexBinaryIVF& other, idx_t add_id);
+    void merge_from(IndexBinary& other, idx_t add_id) override;
+
+    void check_compatible_for_merge(
+            const IndexBinary& otherIndex) const override;
 
     size_t get_list_size(size_t list_no) const {
         return invlists->list_size(list_no);
     }
 
-    /** intialize a direct map
+    /** initialize a direct map
      *
      * @param new_maintain_direct_map    if true, create a direct map,
      *                                   else clear it
@@ -237,19 +245,19 @@ struct IndexBinaryIVF : IndexBinary {
     void range_search_thread_safe(
             idx_t n,
             const uint8_t* x,
-            float radius,
+            int radius,
             RangeSearchResult* res,
-            size_t nprobe,
-            const BitsetView bitset) const;
+            const SearchParameters* params = nullptr) const;
+
     void range_search_preassigned_thread_safe(
             idx_t n,
             const uint8_t* x,
-            float radius,
+            int radius,
             const idx_t* assign,
             const int32_t* centroid_dis,
             RangeSearchResult* res,
-            size_t nprobe,
-            const BitsetView bitset) const;
+            const SearchParameters* params = nullptr) const;
+
     void search_preassigned_thread_safe(
             idx_t n,
             const uint8_t* x,
@@ -259,13 +267,19 @@ struct IndexBinaryIVF : IndexBinary {
             int32_t* distances,
             idx_t* labels,
             bool store_pairs,
-            const IVFSearchParameters* params,
-            const size_t nprobe,
-            const BitsetView bitset) const;
+            const IVFSearchParameters* params = nullptr) const;
 };
 
 struct BinaryInvertedListScanner {
-    using idx_t = Index::idx_t;
+    /// store positions in invlists rather than labels
+    bool store_pairs;
+    /// search in this subset of ids
+    const IDSelector* sel;
+
+    BinaryInvertedListScanner(
+            bool store_pairs = false,
+            const IDSelector* sel = nullptr)
+            : store_pairs(store_pairs), sel(sel) {}
 
     /// from now on we handle this query.
     virtual void set_query(const uint8_t* query_vector) = 0;
@@ -274,7 +288,7 @@ struct BinaryInvertedListScanner {
     virtual void set_list(idx_t list_no, uint8_t coarse_dis) = 0;
 
     /// compute a single query-to-code distance
-    virtual float distance_to_code(const uint8_t* code) const = 0;
+    virtual uint32_t distance_to_code(const uint8_t* code) const = 0;
 
     /** compute the distances to codes. (distances, labels) should be
      * organized as a min- or max-heap
@@ -286,22 +300,24 @@ struct BinaryInvertedListScanner {
      * @param labels     heap labels (size k)
      * @param k          heap size
      */
+    // todo aguzhva: InvertedListsScanner has
+    //   const IDSelector* field;
     virtual size_t scan_codes(
             size_t n,
             const uint8_t* codes,
             const idx_t* ids,
             int32_t* distances,
             idx_t* labels,
-            size_t k,
-            const BitsetView bitset = nullptr) const = 0;
+            size_t k) const = 0;
 
+    // todo aguzhva: InvertedListsScanner has
+    //   const IDSelector* field;
     virtual void scan_codes_range(
             size_t n,
             const uint8_t* codes,
             const idx_t* ids,
-            float radius,
-            RangeQueryResult& result,
-            const BitsetView bitset = nullptr) const = 0;
+            int radius,
+            RangeQueryResult& result) const = 0;
 
     virtual ~BinaryInvertedListScanner() {}
 };

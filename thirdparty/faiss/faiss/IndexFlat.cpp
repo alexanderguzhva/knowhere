@@ -7,6 +7,7 @@
 
 // -*- c++ -*-
 
+#include <faiss/FaissHook.h>
 #include <faiss/IndexFlat.h>
 
 #include <faiss/impl/AuxIndexStructures.h>

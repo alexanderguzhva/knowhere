@@ -79,10 +79,18 @@ fvec_hook(std::string& simd_type) {
     std::lock_guard<std::mutex> lock(hook_mutex);
 #if defined(__x86_64__)
     if (use_avx512 && cpu_support_avx512()) {
+        // todo aguzhva: temporary
+        #if defined(__AVX512__)
         fvec_inner_product = fvec_inner_product_avx512;
         fvec_L2sqr = fvec_L2sqr_avx512;
         fvec_L1 = fvec_L1_avx512;
         fvec_Linf = fvec_Linf_avx512;
+        #else
+        fvec_inner_product = fvec_inner_product_avx;
+        fvec_L2sqr = fvec_L2sqr_avx;
+        fvec_L1 = fvec_L1_avx;
+        fvec_Linf = fvec_Linf_avx;
+        #endif
 
         fvec_norm_L2sqr = fvec_norm_L2sqr_sse;
         fvec_L2sqr_ny = fvec_L2sqr_ny_sse;

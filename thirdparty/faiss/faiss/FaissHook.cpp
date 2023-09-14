@@ -24,9 +24,16 @@ void sq_hook() {
 
     if (use_avx512 && cpu_support_avx512()) {
         /* for IVFSQ */
+        // todo aguzhva: temporary
+        #if defined(__AVX512__)
         sq_get_distance_computer = sq_get_distance_computer_avx512;
         sq_sel_quantizer = sq_select_quantizer_avx512;
         sq_sel_inv_list_scanner = sq_select_inverted_list_scanner_avx512;
+        #else
+        sq_get_distance_computer = sq_get_distance_computer_avx;
+        sq_sel_quantizer = sq_select_quantizer_avx;
+        sq_sel_inv_list_scanner = sq_select_inverted_list_scanner_avx;
+        #endif
     } else if (use_avx2 && cpu_support_avx2()) {
         /* for IVFSQ */
         sq_get_distance_computer = sq_get_distance_computer_avx;

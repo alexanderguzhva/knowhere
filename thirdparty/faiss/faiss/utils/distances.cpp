@@ -21,6 +21,7 @@
 #include <faiss/FaissHook.h>
 #include <faiss/impl/AuxIndexStructures.h>
 #include <faiss/impl/FaissAssert.h>
+#include <faiss/impl/IDSelector.h>
 #include <faiss/impl/ResultHandler.h>
 #include <faiss/utils/utils.h>
 
@@ -110,7 +111,7 @@ void exhaustive_parallel_on_nx(
         size_t ny,
         ResultHandler& res,
         decltype(fvec_inner_product) dis_compute_func,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     using SingleResultHandler = typename ResultHandler::SingleResultHandler;
 #pragma omp parallel
     {
@@ -122,7 +123,9 @@ void exhaustive_parallel_on_nx(
 
             resi.begin(i);
             for (size_t j = 0; j < ny; j++) {
-                if (bitset.empty() || !bitset.test(j)) {
+                // todo aguzhva: bitset was here
+                //if (bitset.empty() || !bitset.test(j)) {
+                if (!sel || sel->is_member(j)) {
                     float ip = dis_compute_func(x_i, y_j, d);
                     resi.add_result(ip, j);
                 }
@@ -142,7 +145,7 @@ void exhaustive_parallel_on_ny(
         size_t ny,
         ResultHandler& res,
         decltype(fvec_inner_product) dis_compute_func,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     using SingleResultHandler = typename ResultHandler::SingleResultHandler;
     size_t k = res.k;
     size_t thread_max_num = omp_get_max_threads();
@@ -170,7 +173,9 @@ void exhaustive_parallel_on_ny(
 #pragma omp parallel for schedule(static)
         for (size_t j = 0; j < ny; j++) {
             int t = omp_get_thread_num();
-            if (bitset.empty() || !bitset.test(j)) {
+            // todo aguzhva: bitset was here
+            //if (bitset.empty() || !bitset.test(j)) {
+            if (!sel || sel->is_member(j)) {
                 const float* y_j = y + j * d;
                 const float* x_i = x + x_from * d;
                 for (size_t i = 0; i < size; i++) {
@@ -208,15 +213,15 @@ void exhaustive_L2sqr_IP_seq(
         size_t ny,
         ResultHandler& res,
         decltype(fvec_inner_product) dis_compute_func,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     size_t thread_max_num = omp_get_max_threads();
     if (ny > parallel_policy_threshold ||
         (nx < thread_max_num / 2 && ny >= thread_max_num * 32)) {
         exhaustive_parallel_on_ny(
-                x, y, d, nx, ny, res, dis_compute_func, bitset);
+                x, y, d, nx, ny, res, dis_compute_func, sel);
     } else {
         exhaustive_parallel_on_nx(
-                x, y, d, nx, ny, res, dis_compute_func, bitset);
+                x, y, d, nx, ny, res, dis_compute_func, sel);
     }
 }
 
@@ -229,7 +234,7 @@ void exhaustive_inner_product_seq(
         size_t nx,
         size_t ny,
         ResultHandler& res,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     using SingleResultHandler = typename ResultHandler::SingleResultHandler;
     int nt = std::min(int(nx), omp_get_max_threads());
 
@@ -242,7 +247,9 @@ void exhaustive_inner_product_seq(
             const float* y_j = y;
             resi.begin(i);
             for (size_t j = 0; j < ny; j++) {
-                if (bitset.empty() || !bitset.test(j)) {
+                // todo aguzhva: bitset was here
+                //if (bitset.empty() || !bitset.test(j)) {
+                if (!sel || sel->is_member(j)) {
                     float ip = fvec_inner_product(x_i, y_j, d);
                     resi.add_result(ip, j);
                 }
@@ -261,7 +268,7 @@ void exhaustive_L2sqr_seq(
         size_t nx,
         size_t ny,
         ResultHandler& res,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     using SingleResultHandler = typename ResultHandler::SingleResultHandler;
     int nt = std::min(int(nx), omp_get_max_threads());
 
@@ -274,7 +281,9 @@ void exhaustive_L2sqr_seq(
             const float* y_j = y;
             resi.begin(i);
             for (size_t j = 0; j < ny; j++) {
-                if (bitset.empty() || !bitset.test(j)) {
+                // todo aguzhva: bitset was here
+                //if (bitset.empty() || !bitset.test(j)) {
+                if (!sel || sel->is_member(j)) {
                     float disij = fvec_L2sqr(x_i, y_j, d);
                     resi.add_result(disij, j);
                 }
@@ -287,6 +296,7 @@ void exhaustive_L2sqr_seq(
 
 namespace {
 float fvec_cosine(const float* x, const float* y, size_t d) {
+    // todo aguzhva: this is slow
     return fvec_inner_product(x, y, d) / sqrtf(fvec_norm_L2sqr(y, d));
 }
 } // namespace
@@ -299,7 +309,7 @@ void exhaustive_cosine_seq(
         size_t nx,
         size_t ny,
         ResultHandler& res,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     using SingleResultHandler = typename ResultHandler::SingleResultHandler;
     int nt = std::min(int(nx), omp_get_max_threads());
 
@@ -312,7 +322,9 @@ void exhaustive_cosine_seq(
             const float* y_j = y;
             resi.begin(i);
             for (size_t j = 0; j < ny; j++) {
-                if (bitset.empty() || !bitset.test(j)) {
+                // todo aguzhva: bitset was here
+                //if (bitset.empty() || !bitset.test(j)) {
+                if (!sel || sel->is_member(j)) {
                     float disij = fvec_cosine(x_i, y_j, d);
                     resi.add_result(disij, j);
                 }
@@ -332,7 +344,7 @@ void exhaustive_inner_product_blas(
         size_t nx,
         size_t ny,
         ResultHandler& res,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     // BLAS does not like empty matrices
     if (nx == 0 || ny == 0)
         return;
@@ -372,7 +384,9 @@ void exhaustive_inner_product_blas(
                        &nyi);
             }
 
-            res.add_results(j0, j1, ip_block.get(), bitset);
+            // // todo aguzhva: bitset was here
+            // res.add_results(j0, j1, ip_block.get(), bitset);
+            res.add_results(j0, j1, ip_block.get(), sel);
         }
         res.end_multiple();
         InterruptCallback::check();
@@ -390,7 +404,7 @@ void exhaustive_L2sqr_blas(
         size_t ny,
         ResultHandler& res,
         const float* y_norms = nullptr,
-        const BitsetView bitset = nullptr) {
+        const IDSelector* sel = nullptr) {
     // BLAS does not like empty matrices
     if (nx == 0 || ny == 0)
         return;
@@ -458,7 +472,9 @@ void exhaustive_L2sqr_blas(
                     ip_line++;
                 }
             }
-            res.add_results(j0, j1, ip_block.get(), bitset);
+            // // todo aguzhva: bitset was here
+            // res.add_results(j0, j1, ip_block.get(), bitset);
+            res.add_results(j0, j1, ip_block.get(), sel);
         }
         res.end_multiple();
         InterruptCallback::check();
@@ -473,7 +489,7 @@ void exhaustive_cosine_blas(
         size_t nx,
         size_t ny,
         ResultHandler& res,
-        const BitsetView bitset = nullptr) {
+        const IDSelector* sel = nullptr) {
     // BLAS does not like empty matrices
     if (nx == 0 || ny == 0)
         return;
@@ -528,7 +544,9 @@ void exhaustive_cosine_blas(
                     ip_line++;
                 }
             }
-            res.add_results(j0, j1, ip_block.get(), bitset);
+            // // todo aguzhva: bitset was here
+            // res.add_results(j0, j1, ip_block.get(), bitset);
+            res.add_results(j0, j1, ip_block.get(), sel);
         }
         res.end_multiple();
         InterruptCallback::check();
@@ -544,7 +562,7 @@ static void knn_jaccard_blas(
         size_t ny,
         ResultHandler& res,
         const DistanceCorrection& corr,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     // BLAS does not like empty matrices
     if (nx == 0 || ny == 0)
         return;
@@ -596,7 +614,9 @@ static void knn_jaccard_blas(
                 float* ip_line = ip_block + (i - i0) * (j1 - j0);
 
                 for (size_t j = j0; j < j1; j++) {
-                    if (bitset.empty() || !bitset.test(j)) {
+                    // // todo aguzhva: bitset was here
+                    // if (bitset.empty() || !bitset.test(j)) {
+                    if (!sel || sel->is_member(j)) {
                         float ip = *ip_line;
                         float dis = 1.0 - ip / (x_norms[i] + y_norms[j] - ip);
 
@@ -635,24 +655,24 @@ void knn_inner_product(
         size_t nx,
         size_t ny,
         float_minheap_array_t* ha,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     if (ha->k < distance_compute_min_k_reservoir) {
         HeapResultHandler<CMin<float, int64_t>> res(
                 ha->nh, ha->val, ha->ids, ha->k);
         if (nx < distance_compute_blas_threshold) {
             exhaustive_L2sqr_IP_seq(
-                    x, y, d, nx, ny, res, fvec_inner_product, bitset);
+                    x, y, d, nx, ny, res, fvec_inner_product, sel);
         } else {
-            exhaustive_inner_product_blas(x, y, d, nx, ny, res, bitset);
+            exhaustive_inner_product_blas(x, y, d, nx, ny, res, sel);
         }
     } else {
         ReservoirResultHandler<CMin<float, int64_t>> res(
                 ha->nh, ha->val, ha->ids, ha->k);
         if (nx < distance_compute_blas_threshold) {
             exhaustive_L2sqr_IP_seq(
-                    x, y, d, nx, ny, res, fvec_inner_product, bitset);
+                    x, y, d, nx, ny, res, fvec_inner_product, sel);
         } else {
-            exhaustive_inner_product_blas(x, y, d, nx, ny, res, bitset);
+            exhaustive_inner_product_blas(x, y, d, nx, ny, res, sel);
         }
     }
 }
@@ -665,23 +685,23 @@ void knn_L2sqr(
         size_t ny,
         float_maxheap_array_t* ha,
         const float* y_norm2,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     if (ha->k < distance_compute_min_k_reservoir) {
         HeapResultHandler<CMax<float, int64_t>> res(
                 ha->nh, ha->val, ha->ids, ha->k);
 
         if (nx < distance_compute_blas_threshold) {
-            exhaustive_L2sqr_IP_seq(x, y, d, nx, ny, res, fvec_L2sqr, bitset);
+            exhaustive_L2sqr_IP_seq(x, y, d, nx, ny, res, fvec_L2sqr, sel);
         } else {
-            exhaustive_L2sqr_blas(x, y, d, nx, ny, res, y_norm2, bitset);
+            exhaustive_L2sqr_blas(x, y, d, nx, ny, res, y_norm2, sel);
         }
     } else {
         ReservoirResultHandler<CMax<float, int64_t>> res(
                 ha->nh, ha->val, ha->ids, ha->k);
         if (nx < distance_compute_blas_threshold) {
-            exhaustive_L2sqr_IP_seq(x, y, d, nx, ny, res, fvec_L2sqr, bitset);
+            exhaustive_L2sqr_IP_seq(x, y, d, nx, ny, res, fvec_L2sqr, sel);
         } else {
-            exhaustive_L2sqr_blas(x, y, d, nx, ny, res, y_norm2, bitset);
+            exhaustive_L2sqr_blas(x, y, d, nx, ny, res, y_norm2, sel);
         }
     }
 }
@@ -693,23 +713,23 @@ void knn_cosine(
         size_t nx,
         size_t ny,
         float_minheap_array_t* ha,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     if (ha->k < distance_compute_min_k_reservoir) {
         HeapResultHandler<CMin<float, int64_t>> res(
                 ha->nh, ha->val, ha->ids, ha->k);
         if (nx < distance_compute_blas_threshold) {
-            exhaustive_L2sqr_IP_seq(x, y, d, nx, ny, res, fvec_cosine, bitset);
+            exhaustive_L2sqr_IP_seq(x, y, d, nx, ny, res, fvec_cosine, sel);
         } else {
-            exhaustive_cosine_blas(x, y, d, nx, ny, res, bitset);
+            exhaustive_cosine_blas(x, y, d, nx, ny, res, sel);
         }
     } else {
         ReservoirResultHandler<CMin<float, int64_t>> res(
                 ha->nh, ha->val, ha->ids, ha->k);
         if (nx < distance_compute_blas_threshold) {
             exhaustive_L2sqr_IP_seq(
-                    x, y, d, nx, ny, res, fvec_cosine, bitset);
+                    x, y, d, nx, ny, res, fvec_cosine, sel);
         } else {
-            exhaustive_cosine_blas(x, y, d, nx, ny, res, bitset);
+            exhaustive_cosine_blas(x, y, d, nx, ny, res, sel);
         }
     }
 }
@@ -727,7 +747,7 @@ void knn_jaccard(
         size_t nx,
         size_t ny,
         float_maxheap_array_t* ha,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     if (d % 4 != 0) {
         // knn_jaccard_sse(x, y, d, nx, ny, res);
         FAISS_ASSERT_MSG(false, "dim is not multiple of 4!");
@@ -735,7 +755,7 @@ void knn_jaccard(
         NopDistanceCorrection nop;
         HeapResultHandler<CMax<float, int64_t>> res(
                 ha->nh, ha->val, ha->ids, ha->k);
-        knn_jaccard_blas(x, y, d, nx, ny, res, nop, bitset);
+        knn_jaccard_blas(x, y, d, nx, ny, res, nop, sel);
     }
 }
 
@@ -751,12 +771,12 @@ void range_search_L2sqr(
         size_t ny,
         float radius,
         RangeSearchResult* res,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     RangeSearchResultHandler<CMax<float, int64_t>> resh(res, radius);
     if (nx < distance_compute_blas_threshold) {
-        exhaustive_L2sqr_seq(x, y, d, nx, ny, resh, bitset);
+        exhaustive_L2sqr_seq(x, y, d, nx, ny, resh, sel);
     } else {
-        exhaustive_L2sqr_blas(x, y, d, nx, ny, resh, nullptr, bitset);
+        exhaustive_L2sqr_blas(x, y, d, nx, ny, resh, nullptr, sel);
     }
 }
 
@@ -768,12 +788,12 @@ void range_search_inner_product(
         size_t ny,
         float radius,
         RangeSearchResult* res,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     RangeSearchResultHandler<CMin<float, int64_t>> resh(res, radius);
     if (nx < distance_compute_blas_threshold) {
-        exhaustive_inner_product_seq(x, y, d, nx, ny, resh, bitset);
+        exhaustive_inner_product_seq(x, y, d, nx, ny, resh, sel);
     } else {
-        exhaustive_inner_product_blas(x, y, d, nx, ny, resh, bitset);
+        exhaustive_inner_product_blas(x, y, d, nx, ny, resh, sel);
     }
 }
 
@@ -785,12 +805,12 @@ void range_search_cosine(
         size_t ny,
         float radius,
         RangeSearchResult* res,
-        const BitsetView bitset) {
+        const IDSelector* sel) {
     RangeSearchResultHandler<CMin<float, int64_t>> resh(res, radius);
     if (nx < distance_compute_blas_threshold) {
-        exhaustive_cosine_seq(x, y, d, nx, ny, resh, bitset);
+        exhaustive_cosine_seq(x, y, d, nx, ny, resh, sel);
     } else {
-        exhaustive_cosine_blas(x, y, d, nx, ny, resh, bitset);
+        exhaustive_cosine_blas(x, y, d, nx, ny, resh, sel);
     }
 }
 

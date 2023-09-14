@@ -123,7 +123,7 @@ const uint8_t* InvertedLists::get_codes(size_t list_no, size_t offset)
     return get_codes(list_no) + offset * code_size;
 }
 
-const Index::idx_t* InvertedLists::get_ids(size_t list_no, size_t offset) const {
+const idx_t* InvertedLists::get_ids(size_t list_no, size_t offset) const {
     return get_ids(list_no);
 }
 
@@ -503,7 +503,7 @@ const uint8_t* ConcurrentArrayInvertedLists::get_codes(size_t list_no) const {
     FAISS_THROW_MSG("not implemented get_codes for non-continuous storage");
 }
 
-const InvertedLists::idx_t* ConcurrentArrayInvertedLists::get_ids(size_t list_no) const {
+const idx_t* ConcurrentArrayInvertedLists::get_ids(size_t list_no) const {
     FAISS_THROW_MSG("not implemented get_ids for non-continuous storage");
 }
 size_t ConcurrentArrayInvertedLists::add_entries(
@@ -718,7 +718,7 @@ const uint8_t* ConcurrentArrayInvertedLists::get_codes(
     return reinterpret_cast<const uint8_t *>(&(codes[list_no][segment_no][segment_off]));
 }
 
-const InvertedLists::idx_t* ConcurrentArrayInvertedLists::get_ids(
+const idx_t* ConcurrentArrayInvertedLists::get_ids(
         size_t list_no,
         size_t offset) const {
     assert(list_no < nlist);
@@ -735,7 +735,7 @@ const uint8_t* ConcurrentArrayInvertedLists::get_single_code(
     return get_codes(list_no, offset);
 }
 
-InvertedLists::idx_t ConcurrentArrayInvertedLists::get_single_id(size_t list_no, size_t offset)
+idx_t ConcurrentArrayInvertedLists::get_single_id(size_t list_no, size_t offset)
         const {
     auto *pItem = get_ids(list_no, offset);
     return *pItem;
@@ -922,7 +922,7 @@ const uint8_t* ReadOnlyArrayInvertedLists::get_codes(
 #endif
 }
 
-const InvertedLists::idx_t* ReadOnlyArrayInvertedLists::get_ids(
+const idx_t* ReadOnlyArrayInvertedLists::get_ids(
         size_t list_no) const {
     FAISS_ASSERT(list_no < nlist && valid);
 #ifdef USE_GPU
@@ -933,7 +933,7 @@ const InvertedLists::idx_t* ReadOnlyArrayInvertedLists::get_ids(
 #endif
 }
 
-const InvertedLists::idx_t* ReadOnlyArrayInvertedLists::get_all_ids() const {
+const idx_t* ReadOnlyArrayInvertedLists::get_all_ids() const {
     FAISS_ASSERT(valid);
 #ifdef USE_GPU
     return (idx_t*)(pin_readonly_ids->data);

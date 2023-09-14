@@ -531,7 +531,8 @@ void IndexIVF::search_preassigned(
             nlistv++;
 
             try {
-                // todo aguzhva: segments here
+                // todo aguzhva: validate segments code here
+                //   also, iterators don't seem to know how to use segments
                 if (invlists->use_iterator) {
                     size_t list_size = 0;
 
@@ -543,39 +544,35 @@ void IndexIVF::search_preassigned(
 
                     return list_size;
                 } else {
-                    size_t list_size = invlists->list_size(key);
-                    if (list_size > list_size_max) {
-                        list_size = list_size_max;
-                    }
+                    size_t scan_cnt = 0;
 
-                    InvertedLists::ScopedCodes scodes(invlists, key);
-                    const uint8_t* codes = scodes.get();
+                    size_t segment_num = invlists->get_segment_num(key);
+                    for (size_t segment_idx = 0; segment_idx < segment_num; segment_idx++) {
+                        size_t segment_size = invlists->get_segment_size(key, segment_idx);
+                        size_t segment_offset = invlists->get_segment_offset(key, segment_idx);
+                        InvertedLists::ScopedCodes scodes(invlists, key, segment_offset);
+                        std::unique_ptr<InvertedLists::ScopedIds> sids;
+                        const idx_t* ids = nullptr;
 
-                    std::unique_ptr<InvertedLists::ScopedIds> sids;
-                    const idx_t* ids = nullptr;
+                        auto scode_norms = std::make_unique<InvertedLists::ScopedCodeNorms>(invlists, key, segment_offset);
+                        const float* code_norms = scode_norms->get();
 
-                    if (!store_pairs) {
-                        sids.reset(new InvertedLists::ScopedIds(invlists, key));
-                        ids = sids->get();
-                    }
-
-                    if (selr) { // IDSelectorRange
-                        // restrict search to a section of the inverted list
-                        size_t jmin, jmax;
-                        selr->find_sorted_ids_bounds(
-                                list_size, ids, &jmin, &jmax);
-                        list_size = jmax - jmin;
-                        if (list_size == 0) {
-                            return (size_t)0;
+                        if (!store_pairs) {
+                            sids.reset(new InvertedLists::ScopedIds(invlists, key, segment_offset));
+                            ids = sids->get();
                         }
-                        codes += jmin * code_size;
-                        ids += jmin;
-                    }
+                        nheap += scanner->scan_codes(
+                                segment_size,
+                                scodes.get(),
+                                code_norms,
+                                ids,
+                                simi,
+                                idxi,
+                                k);
+                        scan_cnt += segment_size;
+                    }                
 
-                    nheap += scanner->scan_codes(
-                            list_size, codes, ids, simi, idxi, k);
-
-                    return list_size;
+                    return scan_cnt;
                 }
             } catch (const std::exception& e) {
                 std::lock_guard<std::mutex> lock(exception_mutex);
@@ -823,7 +820,8 @@ void IndexIVF::range_search_preassigned(
             }
 
             try {
-                // todo aguzhva: segments here
+                // todo aguzhva: validate segments here
+                //   also, iterators don't know how to use segments
                 size_t list_size = 0;
                 scanner->set_list(key, coarse_dis[i * nprobe + ik]);
                 if (invlists->use_iterator) {
@@ -832,16 +830,31 @@ void IndexIVF::range_search_preassigned(
 
                     scanner->iterate_codes_range(
                             it.get(), radius, qres, list_size);
-                } else {
-                    InvertedLists::ScopedCodes scodes(invlists, key);
-                    InvertedLists::ScopedIds ids(invlists, key);
-                    list_size = invlists->list_size(key);
 
-                    scanner->scan_codes_range(
-                            list_size, scodes.get(), ids.get(), radius, qres);
+                    nlistv++;
+                    ndis += list_size;
+                } else {
+                    size_t segment_num = invlists->get_segment_num(key);
+                    for (size_t segment_idx = 0; segment_idx < segment_num; segment_idx++) {
+                        size_t segment_size = invlists->get_segment_size(key, segment_idx);
+                        size_t segment_offset = invlists->get_segment_offset(key, segment_idx);
+
+                        InvertedLists::ScopedCodes scodes(invlists, key, segment_offset);
+                        InvertedLists::ScopedIds ids(invlists, key, segment_offset);
+                        InvertedLists::ScopedCodeNorms scode_norms(invlists, key, segment_offset);
+
+                        scanner->set_list(key, coarse_dis[i * nprobe + ik]);
+                        nlistv++;
+                        ndis += segment_size;
+                        scanner->scan_codes_range(
+                                segment_size,
+                                scodes.get(),
+                                scode_norms.get(),
+                                ids.get(),
+                                radius,
+                                qres);
+                    }
                 }
-                nlistv++;
-                ndis += list_size;
             } catch (const std::exception& e) {
                 std::lock_guard<std::mutex> lock(exception_mutex);
                 exception_string =

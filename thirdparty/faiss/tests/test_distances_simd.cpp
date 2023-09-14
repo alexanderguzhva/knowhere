@@ -13,6 +13,7 @@
 #include <random>
 #include <vector>
 
+#include <faiss/FaissHook.h>
 #include <faiss/utils/distances.h>
 
 // reference implementations
