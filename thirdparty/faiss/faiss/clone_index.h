@@ -19,6 +19,9 @@ namespace faiss {
 struct Index;
 struct IndexIVF;
 struct VectorTransform;
+struct Quantizer;
+struct IndexBinary;
+
 
 namespace gpu {
     struct GpuIndexFlat;
@@ -36,5 +39,9 @@ struct Cloner {
     virtual IndexIVF* clone_IndexIVF(const IndexIVF*);
     virtual ~Cloner() {}
 };
+
+Quantizer* clone_Quantizer(const Quantizer* quant);
+
+IndexBinary* clone_binary_index(const IndexBinary* index);
 
 } // namespace faiss

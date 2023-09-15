@@ -211,6 +211,7 @@ struct IVFSQScannerIP : InvertedListScanner {
     size_t scan_codes(
             size_t list_size,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float* simi,
             idx_t* idxi,
@@ -236,6 +237,7 @@ struct IVFSQScannerIP : InvertedListScanner {
     void scan_codes_range(
             size_t list_size,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float radius,
             RangeQueryResult& res) const override {
@@ -311,6 +313,7 @@ struct IVFSQScannerL2 : InvertedListScanner {
     size_t scan_codes(
             size_t list_size,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float* simi,
             idx_t* idxi,
@@ -335,6 +338,7 @@ struct IVFSQScannerL2 : InvertedListScanner {
     void scan_codes_range(
             size_t list_size,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float radius,
             RangeQueryResult& res) const override {

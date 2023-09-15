@@ -119,8 +119,6 @@ void IndexBinaryIVF::search_and_reconstruct_thread_safe(
 
 namespace {
 
-using idx_t = Index::idx_t;
-
 template <class HammingComputer>
 struct IVFBinaryScannerL2 : BinaryInvertedListScanner {
     HammingComputer hc;

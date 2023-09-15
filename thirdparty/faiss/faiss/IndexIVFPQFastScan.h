@@ -40,6 +40,9 @@ struct IndexIVFPQFastScan : IndexIVFFastScan {
     /// if use_precompute_table size (nlist, pq.M, pq.ksub)
     AlignedTable<float> precomputed_table;
 
+    bool is_cosine_ = false;
+    std::vector<float> norms;
+
     // todo agzuhva: add back cosine support from knowhere
     IndexIVFPQFastScan(
             Index* quantizer,

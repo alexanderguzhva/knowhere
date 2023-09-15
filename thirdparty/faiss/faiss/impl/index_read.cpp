@@ -207,9 +207,9 @@ InvertedLists* read_InvertedLists(IOReader* f, int io_flags) {
         size_t n;
         READ1(n);
 #ifdef USE_GPU
-        ails->pin_readonly_ids = std::make_shared<PageLockMemory>(n * sizeof(InvertedLists::idx_t));
+        ails->pin_readonly_ids = std::make_shared<PageLockMemory>(n * sizeof(idx_t));
         ails->pin_readonly_codes = std::make_shared<PageLockMemory>(n * code_size * sizeof(uint8_t));
-        READANDCHECK((InvertedLists::idx_t *) ails->pin_readonly_ids->data, n);
+        READANDCHECK((idx_t *) ails->pin_readonly_ids->data, n);
         READANDCHECK((uint8_t *) ails->pin_readonly_codes->data, n * code_size);
 #else
         ails->readonly_ids.resize(n);
@@ -320,7 +320,7 @@ InvertedLists *read_InvertedLists_nm(IOReader *f, int io_flags) {
             OnDiskInvertedLists::List & l = ails->lists[i];
             l.size = l.capacity = sizes[i];
             l.offset = o;
-            o += l.size * (sizeof(OnDiskInvertedLists::idx_t) +
+            o += l.size * (sizeof(idx_t) +
                            ails->code_size);
         }
         FAISS_THROW_IF_NOT(o <= ails->totsize);

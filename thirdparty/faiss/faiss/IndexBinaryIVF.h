@@ -130,7 +130,8 @@ struct IndexBinaryIVF : IndexBinary {
             const IVFSearchParameters* params = nullptr) const;
 
     virtual BinaryInvertedListScanner* get_InvertedListScanner(
-            bool store_pairs = false) const;
+            bool store_pairs = false,
+            const IDSelector* sel = nullptr) const;
 
     /** assign the vectors, then call search_preassign */
     void search(
@@ -271,7 +272,6 @@ struct IndexBinaryIVF : IndexBinary {
 };
 
 struct BinaryInvertedListScanner {
-    /// store positions in invlists rather than labels
     bool store_pairs;
     /// search in this subset of ids
     const IDSelector* sel;

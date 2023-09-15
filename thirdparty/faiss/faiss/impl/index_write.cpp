@@ -300,9 +300,9 @@ void write_InvertedLists(const InvertedLists* ils, IOWriter* f) {
         WRITE1(oa->code_size);
         WRITEVECTOR(oa->readonly_length);
 #ifdef USE_GPU
-        size_t n = oa->pin_readonly_ids->size() / sizeof(InvertedLists::idx_t);
+        size_t n = oa->pin_readonly_ids->size() / sizeof(idx_t);
         WRITE1(n);
-        WRITEANDCHECK((InvertedLists::idx_t*)oa->pin_readonly_ids->data, n);
+        WRITEANDCHECK((idx_t*)oa->pin_readonly_ids->data, n);
         WRITEANDCHECK((uint8_t*)oa->pin_readonly_codes->data, n * oa->code_size);
 #else
         size_t n = oa->readonly_ids.size();

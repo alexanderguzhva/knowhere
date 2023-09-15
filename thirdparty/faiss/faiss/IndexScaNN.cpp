@@ -23,8 +23,6 @@ IndexScaNN::IndexScaNN() : IndexRefineFlat() {}
 
 namespace {
 
-typedef faiss::Index::idx_t idx_t;
-
 template <class C>
 static void reorder_2_heaps(
         idx_t n,
