@@ -233,14 +233,14 @@ void IndexPQ::search(
                     size_t(n), size_t(k), labels, idistances};
 
             if (search_type == ST_HE) {
+                // todo aguzhva: baseline knowhere had bitset here (binary_knn_hc call)
                 hammings_knn_hc(
                         &res,
                         q_codes,
                         codes.data(),
                         ntotal,
                         pq.code_size,
-                        true,
-                        (iparams == nullptr) ? nullptr : iparams->sel);
+                        true);
 
             } else if (search_type == ST_generalized_HE) {
                 generalized_hammings_knn_hc(
