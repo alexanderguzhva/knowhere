@@ -22,6 +22,8 @@
 #include <faiss/utils/hamming.h>
 #include <faiss/utils/utils.h>
 
+#include "simd/hook.h"
+
 extern "C" {
 
 // general matrix multiplication

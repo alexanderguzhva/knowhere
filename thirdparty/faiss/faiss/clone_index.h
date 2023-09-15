@@ -13,6 +13,9 @@
 
 namespace faiss {
 
+// todo aguzhva: get rid of this file by adding Index* Index::clone() function.
+//   same for quantizers.
+
 struct Index;
 struct IndexIVF;
 struct VectorTransform;

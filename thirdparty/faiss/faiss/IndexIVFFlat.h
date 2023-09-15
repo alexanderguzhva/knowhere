@@ -26,7 +26,7 @@ struct IndexIVFFlat : IndexIVF {
             Index* quantizer,
             size_t d,
             size_t nlist_,
-            bool is_cosine,
+            bool is_cosine = false,
             MetricType = METRIC_L2);
 
     void restore_codes(const uint8_t* raw_data, const size_t raw_size);

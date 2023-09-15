@@ -37,7 +37,7 @@ IndexIVFFlat::IndexIVFFlat(
         Index* quantizer,
         size_t d,
         size_t nlist,
-bool is_cosine,
+        bool is_cosine,
         MetricType metric)
         : IndexIVF(quantizer, d, nlist, sizeof(float) * d, metric), is_cosine_(is_cosine) {
     code_size = sizeof(float) * d;

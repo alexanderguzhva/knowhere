@@ -17,6 +17,8 @@
 
 #include <faiss/utils/approx_topk/approx_topk.h>
 
+#include "simd/hook.h"
+
 extern "C" {
 
 // general matrix multiplication

@@ -10,6 +10,8 @@
 #include "simd/hook.h"
 namespace faiss {
 
+// todo aguzhva: replace FaissHook.h with simd/hook.h
+
 struct IDSelector;
 
 typedef ScalarQuantizer::SQDistanceComputer* (*sq_get_distance_computer_func_ptr)(

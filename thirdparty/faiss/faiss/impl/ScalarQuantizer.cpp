@@ -133,14 +133,8 @@ void ScalarQuantizer::train(size_t n, const float* x) {
 }
 
 ScalarQuantizer::SQuantizer* ScalarQuantizer::select_quantizer() const {
-#ifdef USE_F16C
-    if (d % 8 == 0) {
-        return select_quantizer_1<8>(qtype, d, trained);
-    } else
-#endif
-    {
-        return select_quantizer_1<1>(qtype, d, trained);
-    }
+    /* use hook to decide use AVX512 or not */
+    return sq_sel_quantizer(qtype, d, trained);
 }
 
 void ScalarQuantizer::compute_codes(const float* x, uint8_t* codes, size_t n)
@@ -164,22 +158,12 @@ void ScalarQuantizer::decode(const uint8_t* codes, float* x, size_t n) const {
 SQDistanceComputer* ScalarQuantizer::get_distance_computer(
         MetricType metric) const {
     FAISS_THROW_IF_NOT(metric == METRIC_L2 || metric == METRIC_INNER_PRODUCT);
-#ifdef USE_F16C
-    if (d % 8 == 0) {
-        if (metric == METRIC_L2) {
-            return select_distance_computer<SimilarityL2<8>>(qtype, d, trained);
-        } else {
-            return select_distance_computer<SimilarityIP<8>>(qtype, d, trained);
-        }
-    } else
-#endif
-    {
-        if (metric == METRIC_L2) {
-            return select_distance_computer<SimilarityL2<1>>(qtype, d, trained);
-        } else {
-            return select_distance_computer<SimilarityIP<1>>(qtype, d, trained);
-        }
-    }
+    /* use hook to decide use AVX512 or not */
+    return sq_get_distance_computer(metric, qtype, d, trained);
+}
+
+size_t ScalarQuantizer::cal_size() const {
+    return sizeof(*this) + trained.size() * sizeof(float);
 }
 
 /*******************************************************************
@@ -368,130 +352,6 @@ struct IVFSQScannerL2 : InvertedListScanner {
     }
 };
 
-template <class DCClass, int use_sel>
-InvertedListScanner* sel3_InvertedListScanner(
-        const ScalarQuantizer* sq,
-        const Index* quantizer,
-        bool store_pairs,
-        const IDSelector* sel,
-        bool r) {
-    if (DCClass::Sim::metric_type == METRIC_L2) {
-        return new IVFSQScannerL2<DCClass, use_sel>(
-                sq->d,
-                sq->trained,
-                sq->code_size,
-                quantizer,
-                store_pairs,
-                sel,
-                r);
-    } else if (DCClass::Sim::metric_type == METRIC_INNER_PRODUCT) {
-        return new IVFSQScannerIP<DCClass, use_sel>(
-                sq->d, sq->trained, sq->code_size, store_pairs, sel, r);
-    } else {
-        FAISS_THROW_MSG("unsupported metric type");
-    }
-}
-
-template <class DCClass>
-InvertedListScanner* sel2_InvertedListScanner(
-        const ScalarQuantizer* sq,
-        const Index* quantizer,
-        bool store_pairs,
-        const IDSelector* sel,
-        bool r) {
-    if (sel) {
-        if (store_pairs) {
-            return sel3_InvertedListScanner<DCClass, 2>(
-                    sq, quantizer, store_pairs, sel, r);
-        } else {
-            return sel3_InvertedListScanner<DCClass, 1>(
-                    sq, quantizer, store_pairs, sel, r);
-        }
-    } else {
-        return sel3_InvertedListScanner<DCClass, 0>(
-                sq, quantizer, store_pairs, sel, r);
-    }
-}
-
-template <class Similarity, class Codec, bool uniform>
-InvertedListScanner* sel12_InvertedListScanner(
-        const ScalarQuantizer* sq,
-        const Index* quantizer,
-        bool store_pairs,
-        const IDSelector* sel,
-        bool r) {
-    constexpr int SIMDWIDTH = Similarity::simdwidth;
-    using QuantizerClass = QuantizerTemplate<Codec, uniform, SIMDWIDTH>;
-    using DCClass = DCTemplate<QuantizerClass, Similarity, SIMDWIDTH>;
-    return sel2_InvertedListScanner<DCClass>(
-            sq, quantizer, store_pairs, sel, r);
-}
-
-template <class Similarity>
-InvertedListScanner* sel1_InvertedListScanner(
-        const ScalarQuantizer* sq,
-        const Index* quantizer,
-        bool store_pairs,
-        const IDSelector* sel,
-        bool r) {
-    constexpr int SIMDWIDTH = Similarity::simdwidth;
-    switch (sq->qtype) {
-        case ScalarQuantizer::QT_8bit_uniform:
-            return sel12_InvertedListScanner<Similarity, Codec8bit, true>(
-                    sq, quantizer, store_pairs, sel, r);
-        case ScalarQuantizer::QT_4bit_uniform:
-            return sel12_InvertedListScanner<Similarity, Codec4bit, true>(
-                    sq, quantizer, store_pairs, sel, r);
-        case ScalarQuantizer::QT_8bit:
-            return sel12_InvertedListScanner<Similarity, Codec8bit, false>(
-                    sq, quantizer, store_pairs, sel, r);
-        case ScalarQuantizer::QT_4bit:
-            return sel12_InvertedListScanner<Similarity, Codec4bit, false>(
-                    sq, quantizer, store_pairs, sel, r);
-        case ScalarQuantizer::QT_6bit:
-            return sel12_InvertedListScanner<Similarity, Codec6bit, false>(
-                    sq, quantizer, store_pairs, sel, r);
-        case ScalarQuantizer::QT_fp16:
-            return sel2_InvertedListScanner<DCTemplate<
-                    QuantizerFP16<SIMDWIDTH>,
-                    Similarity,
-                    SIMDWIDTH>>(sq, quantizer, store_pairs, sel, r);
-        case ScalarQuantizer::QT_8bit_direct:
-            if (sq->d % 16 == 0) {
-                return sel2_InvertedListScanner<
-                        DistanceComputerByte<Similarity, SIMDWIDTH>>(
-                        sq, quantizer, store_pairs, sel, r);
-            } else {
-                return sel2_InvertedListScanner<DCTemplate<
-                        Quantizer8bitDirect<SIMDWIDTH>,
-                        Similarity,
-                        SIMDWIDTH>>(sq, quantizer, store_pairs, sel, r);
-            }
-    }
-
-    FAISS_THROW_MSG("unknown qtype");
-    return nullptr;
-}
-
-template <int SIMDWIDTH>
-InvertedListScanner* sel0_InvertedListScanner(
-        MetricType mt,
-        const ScalarQuantizer* sq,
-        const Index* quantizer,
-        bool store_pairs,
-        const IDSelector* sel,
-        bool by_residual) {
-    if (mt == METRIC_L2) {
-        return sel1_InvertedListScanner<SimilarityL2<SIMDWIDTH>>(
-                sq, quantizer, store_pairs, sel, by_residual);
-    } else if (mt == METRIC_INNER_PRODUCT) {
-        return sel1_InvertedListScanner<SimilarityIP<SIMDWIDTH>>(
-                sq, quantizer, store_pairs, sel, by_residual);
-    } else {
-        FAISS_THROW_MSG("unsupported metric type");
-    }
-}
-
 } // anonymous namespace
 
 InvertedListScanner* ScalarQuantizer::select_InvertedListScanner(
@@ -500,16 +360,9 @@ InvertedListScanner* ScalarQuantizer::select_InvertedListScanner(
         bool store_pairs,
         const IDSelector* sel,
         bool by_residual) const {
-#ifdef USE_F16C
-    if (d % 8 == 0) {
-        return sel0_InvertedListScanner<8>(
-                mt, this, quantizer, store_pairs, sel, by_residual);
-    } else
-#endif
-    {
-        return sel0_InvertedListScanner<1>(
-                mt, this, quantizer, store_pairs, sel, by_residual);
-    }
+    /* use hook to decide use AVX512 or not */
+    return sq_sel_inv_list_scanner(mt, this, quantizer, d, store_pairs,
+                                   sel, by_residual);
 }
 
 } // namespace faiss

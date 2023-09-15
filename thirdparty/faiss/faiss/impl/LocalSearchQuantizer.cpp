@@ -15,8 +15,6 @@
 
 #include <algorithm>
 
-#include <faiss/FaissHook.h>
-
 #include <faiss/impl/AuxIndexStructures.h>
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/utils/distances.h>
@@ -28,9 +26,12 @@
 // this is needed for prefetching
 #include <faiss/impl/platform_macros.h>
 
+// todo aguzhva: is it needed?
 #ifdef __AVX2__
 #include <xmmintrin.h>
 #endif
+
+#include "simd/hook.h"
 
 extern "C" {
 // LU decomoposition of a general matrix
