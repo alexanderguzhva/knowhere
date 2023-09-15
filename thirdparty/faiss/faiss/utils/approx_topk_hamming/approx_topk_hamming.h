@@ -96,7 +96,7 @@ struct HeapWithBucketsForHamming32<
                 for (uint32_t j = 0; j < NBUCKETS_8; j++) {
                     uint32_t hamming_distances[8];
                     for (size_t j8 = 0; j8 < 8; j8++) {
-                        hamming_distances[j8] = hc.hamming(
+                        hamming_distances[j8] = hc.compute(
                                 binary_vectors +
                                 (j8 + j * 8 + ip + n_per_beam * beam_index) *
                                         code_size);
@@ -169,7 +169,7 @@ struct HeapWithBucketsForHamming32<
             for (uint32_t ip = nb; ip < n_per_beam; ip++) {
                 const auto index = ip + n_per_beam * beam_index;
                 const auto value =
-                        hc.hamming(binary_vectors + (index)*code_size);
+                        hc.compute(binary_vectors + (index)*code_size);
 
                 if (C::cmp(bh_val[0], value)) {
                     heap_replace_top<C>(k, bh_val, bh_ids, value, index);
@@ -280,7 +280,7 @@ struct HeapWithBucketsForHamming16<
                 for (uint32_t j = 0; j < NBUCKETS_16; j++) {
                     uint16_t hamming_distances[16];
                     for (size_t j16 = 0; j16 < 16; j16++) {
-                        hamming_distances[j16] = hc.hamming(
+                        hamming_distances[j16] = hc.compute(
                                 binary_vectors +
                                 (j16 + j * 16 + ip + n_per_beam * beam_index) *
                                         code_size);
@@ -354,7 +354,7 @@ struct HeapWithBucketsForHamming16<
             for (uint32_t ip = nb; ip < n_per_beam; ip++) {
                 const auto index = ip + n_per_beam * beam_index;
                 const auto value =
-                        hc.hamming(binary_vectors + (index)*code_size);
+                        hc.compute(binary_vectors + (index)*code_size);
 
                 if (C::cmp(bh_val[0], value)) {
                     heap_replace_top<C>(k, bh_val, bh_ids, value, index);

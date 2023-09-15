@@ -291,7 +291,7 @@ size_t polysemous_inner_loop(
     HammingComputer hc(q_code, code_size);
 
     for (int64_t bi = 0; bi < ntotal; bi++) {
-        int hd = hc.hamming(b_code);
+        int hd = hc.compute(b_code);
 
         if (hd < ht) {
             n_pass_i++;

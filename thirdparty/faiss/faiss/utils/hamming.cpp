@@ -218,7 +218,7 @@ void hammings_knn_hc(
                 HANDLE_APPROX(32, 2)
                 default: {
                     for (size_t j = j0; j < j1; j++, bs2_ += bytes_per_code) {
-                        dis = hc.hamming(bs2_);
+                        dis = hc.compute(bs2_);
                         if (dis < bh_val_[0]) {
                             faiss::maxheap_replace_top<hamdis_t>(
                                     k, bh_val_, bh_ids_, dis, j);
@@ -311,7 +311,7 @@ void hamming_range_search(
                 // todo aguzhva: bitset
                 // if (bitset.empty() || !bitset.test(j)) {
                 if (!sel || sel->is_member(j)) {
-                    int dis = hc.hamming(yi);
+                    int dis = hc.compute(yi);
                     if (dis < radius) {
                         qres.add(dis, j);
                     }
@@ -635,7 +635,7 @@ static void hamming_dis_inner_loop(
     HammingComputer hc(ca, code_size);
 
     for (size_t j = 0; j < nb; j++) {
-        int ndiff = hc.hamming(cb);
+        int ndiff = hc.compute(cb);
         cb += code_size;
         if (ndiff < bh_val_[0]) {
             maxheap_replace_top<hamdis_t>(k, bh_val_, bh_ids_, ndiff, j);

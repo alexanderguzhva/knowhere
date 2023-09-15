@@ -248,7 +248,7 @@ struct IVFScanner : InvertedListScanner {
     }
 
     float distance_to_code(const uint8_t* code) const final {
-        return hc.hamming(code);
+        return hc.compute(code);
     }
 
     size_t scan_codes(
@@ -265,7 +265,7 @@ struct IVFScanner : InvertedListScanner {
             // if (bitset.empty() || !bitset.test(ids[j])) {
             // // todo aguzhva: use int64_t instead of ids[j] ?
             if (!sel || sel->is_member(ids[j])) {
-                float dis = hc.hamming(codes);
+                float dis = hc.compute(codes);
 
                 if (dis < simi[0]) {
                     int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
@@ -290,7 +290,7 @@ struct IVFScanner : InvertedListScanner {
             // if (bitset.empty() || !bitset.test(ids[j])) {
             // // todo aguzhva: use int64_t instead of ids[j] ?
             if (!sel || sel->is_member(ids[j])) {
-                float dis = hc.hamming(codes);
+                float dis = hc.compute(codes);
                 if (dis < radius) {
                     int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
                     res.add(dis, id);

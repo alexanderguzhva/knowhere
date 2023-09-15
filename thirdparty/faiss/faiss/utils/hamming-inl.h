@@ -97,7 +97,7 @@ struct HCounterState {
               k(k) {}
 
     void update_counter(const uint8_t* y, size_t j) {
-        int32_t dis = hc.hamming(y);
+        int32_t dis = hc.compute(y);
 
         if (dis <= thres) {
             if (dis < thres) {

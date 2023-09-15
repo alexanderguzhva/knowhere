@@ -166,7 +166,7 @@ void search_single_query_template(
         } else {
             const uint8_t* codes = il.vecs.data();
             for (size_t i = 0; i < nv; i++) {
-                int dis = hc.hamming(codes);
+                int dis = hc.compute(codes);
                 res.add(dis, il.ids[i]);
                 codes += code_size;
             }
@@ -348,7 +348,7 @@ static void verify_shortlist(
     const uint8_t* codes = index->xb.data();
 
     for (auto i : shortlist) {
-        int dis = hc.hamming(codes + i * code_size);
+        int dis = hc.compute(codes + i * code_size);
         res.add(dis, i);
     }
 }

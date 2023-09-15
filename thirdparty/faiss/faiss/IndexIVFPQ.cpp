@@ -1063,16 +1063,16 @@ struct IVFPQScannerT : QueryTables {
             // 9999999 is just an arbitrary large number
             int hd0 = (res.skip_entry(j + 0))
                     ? 99999999
-                    : hc.hamming(b_code + 0 * code_size);
+                    : hc.compute(b_code + 0 * code_size);
             int hd1 = (res.skip_entry(j + 1))
                     ? 99999999
-                    : hc.hamming(b_code + 1 * code_size);
+                    : hc.compute(b_code + 1 * code_size);
             int hd2 = (res.skip_entry(j + 2))
                     ? 99999999
-                    : hc.hamming(b_code + 2 * code_size);
+                    : hc.compute(b_code + 2 * code_size);
             int hd3 = (res.skip_entry(j + 3))
                     ? 99999999
-                    : hc.hamming(b_code + 3 * code_size);
+                    : hc.compute(b_code + 3 * code_size);
 
             saved_j[counter] = j + 0;
             counter = (hd0 < ht) ? (counter + 1) : counter;
@@ -1137,7 +1137,7 @@ struct IVFPQScannerT : QueryTables {
                 continue;
             }
             const uint8_t* b_code = codes + j * code_size;
-            int hd = hc.hamming(b_code);
+            int hd = hc.compute(b_code);
             if (hd < ht) {
                 n_hamming_pass++;
 
