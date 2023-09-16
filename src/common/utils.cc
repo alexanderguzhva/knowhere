@@ -95,7 +95,7 @@ ConvertIVFFlatIfNeeded(const BinarySet& binset, const uint8_t* raw_data, const s
         auto remains = binary->size - reader.tellg() - sizeof(uint32_t) - sizeof(ivfl->invlists->nlist) -
                        sizeof(ivfl->invlists->code_size);
         auto invlist_size = sizeof(uint32_t) + sizeof(size_t) + ivfl->nlist * sizeof(size_t);
-        auto ids_size = ivfl->ntotal * sizeof(faiss::Index::idx_t);
+        auto ids_size = ivfl->ntotal * sizeof(faiss::idx_t);
         // auto codes_size = ivfl->d * ivfl->ntotal * sizeof(float);
 
         // IVF_FLAT_NM format, need convert to new format
