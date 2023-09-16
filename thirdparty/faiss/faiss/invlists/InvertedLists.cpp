@@ -326,8 +326,8 @@ size_t InvertedLists::compute_ntotal() const {
 ArrayInvertedLists::ArrayInvertedLists(
         size_t nlist,
         size_t code_size,
-        bool with_norm)
-        : with_norm(with_norm), InvertedLists(nlist, code_size) {
+        bool _with_norm)
+        : with_norm(_with_norm), InvertedLists(nlist, code_size) {
     ids.resize(nlist);
     codes.resize(nlist);
     if (with_norm) {

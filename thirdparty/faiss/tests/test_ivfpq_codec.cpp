@@ -18,6 +18,8 @@
 #include <faiss/utils/distances.h>
 #include <faiss/utils/utils.h>
 
+#include "simd/hook.h"
+
 namespace {
 
 // dimension of the vectors to index

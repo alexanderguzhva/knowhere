@@ -44,9 +44,9 @@ struct IndexBinary {
     bool is_trained = true;
 
     /// type of metric this index uses for search
-    MetricType metric_type = METRIC_L2;
+    MetricType metric_type = METRIC_Hamming;
 
-    explicit IndexBinary(idx_t d = 0, MetricType metric = METRIC_L2);
+    explicit IndexBinary(idx_t d = 0, MetricType metric = METRIC_Hamming);
 
     virtual ~IndexBinary();
 
