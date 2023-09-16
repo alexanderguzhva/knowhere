@@ -74,11 +74,13 @@ constexpr const char* NBITS = "nbits";  // PQ/SQ
 constexpr const char* M = "m";          // PQ param for IVFPQ
 constexpr const char* SSIZE = "ssize";
 constexpr const char* REORDER_K = "reorder_k";
+constexpr const char* WITH_RAW_DATA = "with_raw_data";
 
 // HNSW Params
 constexpr const char* EFCONSTRUCTION = "efConstruction";
 constexpr const char* HNSW_M = "M";
 constexpr const char* EF = "ef";
+constexpr const char* SEED_EF = "seed_ef";
 constexpr const char* OVERVIEW_LEVELS = "overview_levels";
 }  // namespace indexparam
 
