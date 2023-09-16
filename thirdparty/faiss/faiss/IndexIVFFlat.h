@@ -58,7 +58,7 @@ struct IndexIVFFlat : IndexIVF {
 
     void sa_decode(idx_t n, const uint8_t* bytes, float* x) const override;
 
-    IndexIVFFlat() = default;
+    IndexIVFFlat();
 };
 
 struct IndexIVFFlatCC : IndexIVFFlat {
