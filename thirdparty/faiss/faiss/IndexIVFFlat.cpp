@@ -314,8 +314,9 @@ IndexIVFFlatDedup::IndexIVFFlatDedup(
         Index* quantizer,
         size_t d,
         size_t nlist_,
+        bool is_cosine,
         MetricType metric_type)
-        : IndexIVFFlat(quantizer, d, nlist_, metric_type) {}
+        : IndexIVFFlat(quantizer, d, nlist_, is_cosine, metric_type) {}
 
 void IndexIVFFlatDedup::train(idx_t n, const float* x) {
     std::unordered_map<uint64_t, idx_t> map;
