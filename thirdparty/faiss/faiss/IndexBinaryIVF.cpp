@@ -1054,6 +1054,10 @@ void IndexBinaryIVF::search_preassigned(
         bool store_pairs,
         const IVFSearchParameters* params,
         IndexIVFStats* stats) const {
+
+    idx_t nprobe = params ? params->nprobe : this->nprobe;
+    nprobe = std::min((idx_t)nlist, nprobe);
+    
     if (metric_type == METRIC_Jaccard) {
         if (use_heap) {
             // todo aguzhva: replace with std::vector
@@ -1121,7 +1125,8 @@ void IndexBinaryIVF::range_search(
         FAISS_THROW_IF_NOT_MSG(params, "IndexBinaryIVF params have incorrect type");
         quantizer_params = params->quantizer_params;
     }
-    const size_t nprobe = std::min(nlist, this->nprobe);
+    const size_t nprobe =
+            std::min(nlist, params ? params->nprobe : this->nprobe);
     std::unique_ptr<idx_t[]> idx(new idx_t[n * nprobe]);
     std::unique_ptr<int32_t[]> coarse_dis(new int32_t[n * nprobe]);
 
@@ -1205,9 +1210,12 @@ void IndexBinaryIVF::range_search_preassigned(
             scanner->set_query(x + i * code_size);
 
             RangeQueryResult& qres = pres.new_result(i);
+            size_t prev_nres = qres.nres;
 
             for (size_t ik = 0; ik < nprobe; ik++) {
                 scan_list_func(i, ik, qres);
+                if (qres.nres == prev_nres) break;
+                prev_nres = qres.nres;
             }
         }
 
