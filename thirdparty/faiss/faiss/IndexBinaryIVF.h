@@ -247,7 +247,7 @@ struct BinaryInvertedListScanner {
     virtual void set_list(idx_t list_no, uint8_t coarse_dis) = 0;
 
     /// compute a single query-to-code distance
-    virtual uint32_t distance_to_code(const uint8_t* code) const = 0;
+    virtual float distance_to_code(const uint8_t* code) const = 0;
 
     /** compute the distances to codes. (distances, labels) should be
      * organized as a min- or max-heap

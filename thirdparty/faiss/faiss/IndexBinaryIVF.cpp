@@ -380,7 +380,7 @@ struct IVFBinaryScannerL2 : BinaryInvertedListScanner {
         this->list_no = list_no;
     }
 
-    uint32_t distance_to_code(const uint8_t* code) const override {
+    float distance_to_code(const uint8_t* code) const override {
         return hc.compute(code);
     }
 
@@ -450,7 +450,7 @@ struct IVFBinaryScannerJaccard : BinaryInvertedListScanner {
         this->list_no = list_no;
     }
 
-    uint32_t distance_to_code(const uint8_t* code) const override {
+    float distance_to_code(const uint8_t* code) const override {
         return hc.compute(code);
     }
 
