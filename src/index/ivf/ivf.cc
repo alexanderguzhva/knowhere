@@ -30,6 +30,8 @@
 #include "knowhere/log.h"
 #include "knowhere/utils.h"
 
+#include "index/bitsetview_idselector.h"
+
 namespace knowhere {
 
 template <typename T>
@@ -300,8 +302,12 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             auto nlist = MatchNlist(rows, scann_cfg.nlist.value());
             bool is_cosine = base_cfg.metric_type.value() == metric::COSINE;
             qzr = new (std::nothrow) typename QuantizerT<T>::type(dim, metric.value());
+            // // todo aguzhva: replaced is_cosine
+            // base_index =
+            //     new (std::nothrow) faiss::IndexIVFPQFastScan(qzr, dim, nlist, dim / 2, 4, is_cosine, metric.value());
             base_index =
-                new (std::nothrow) faiss::IndexIVFPQFastScan(qzr, dim, nlist, dim / 2, 4, is_cosine, metric.value());
+                new (std::nothrow) faiss::IndexIVFPQFastScan(qzr, dim, nlist, dim / 2, 4, metric.value());
+            base_index->is_cosine_ = is_cosine;
             base_index->own_fields = true;
             if (scann_cfg.with_raw_data.value()) {
                 index = std::make_unique<faiss::IndexScaNN>(base_index, (const float*)data);
@@ -314,7 +320,7 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             const IvfSqConfig& ivf_sq_cfg = static_cast<const IvfSqConfig&>(cfg);
             auto nlist = MatchNlist(rows, ivf_sq_cfg.nlist.value());
             qzr = new (std::nothrow) typename QuantizerT<T>::type(dim, metric.value());
-            index = std::make_unique<faiss::IndexIVFScalarQuantizer>(qzr, dim, nlist, faiss::QuantizerType::QT_8bit,
+            index = std::make_unique<faiss::IndexIVFScalarQuantizer>(qzr, dim, nlist, faiss::ScalarQuantizer::QuantizerType::QT_8bit,
                                                                      metric.value());
             index->train(rows, (const float*)data);
         }
@@ -401,9 +407,21 @@ IvfIndexNode<T>::Search(const DataSet& dataset, const Config& cfg, const BitsetV
                 ThreadPool::ScopedOmpSetter setter(1);
                 auto offset = k * index;
                 std::unique_ptr<float[]> copied_query = nullptr;
+
+                BitsetViewIDSelector bw_idselector(bitset);
+                faiss::IDSelector* id_selector = (bitset.empty()) ? nullptr : &bw_idselector;
+
                 if constexpr (std::is_same<T, faiss::IndexBinaryIVF>::value) {
                     auto cur_data = (const uint8_t*)data + index * dim / 8;
-                    index_->search_thread_safe(1, cur_data, k, i_distances + offset, ids + offset, nprobe, bitset);
+
+                    // // todo aguzhva: bitset was here                    
+                    // index_->search_thread_safe(1, cur_data, k, i_distances + offset, ids + offset, nprobe, bitset);
+
+                    faiss::IVFSearchParameters ivf_search_params;
+                    ivf_search_params.nprobe = nprobe;
+                    ivf_search_params.sel = id_selector;
+                    index_->search(1, cur_data, k, i_distances + offset, ids + offset, &ivf_search_params);
+
                     if (index_->metric_type == faiss::METRIC_Hamming) {
                         for (int64_t i = 0; i < k; i++) {
                             distances[i + offset] = static_cast<float>(i_distances[i + offset]);
@@ -415,7 +433,16 @@ IvfIndexNode<T>::Search(const DataSet& dataset, const Config& cfg, const BitsetV
                         copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         cur_query = copied_query.get();
                     }
-                    index_->search_thread_safe(1, cur_query, k, distances + offset, ids + offset, nprobe, 0, bitset);
+
+                    // // todo aguzhva: bitset was here
+                    // index_->search_thread_safe(1, cur_query, k, distances + offset, ids + offset, nprobe, 0, bitset);
+
+                    faiss::IVFSearchParameters ivf_search_params;
+                    ivf_search_params.nprobe = nprobe;
+                    ivf_search_params.max_codes = 0;
+                    ivf_search_params.sel = id_selector;
+
+                    index_->search(1, cur_query, k, distances + offset, ids + offset, &ivf_search_params);
                 } else if constexpr (std::is_same<T, faiss::IndexScaNN>::value) {
                     auto cur_query = (const float*)data + index * dim;
                     const ScannConfig& scann_cfg = static_cast<const ScannConfig&>(cfg);
@@ -423,15 +450,37 @@ IvfIndexNode<T>::Search(const DataSet& dataset, const Config& cfg, const BitsetV
                         copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         cur_query = copied_query.get();
                     }
-                    index_->search_thread_safe(1, cur_query, k, distances + offset, ids + offset, nprobe,
-                                               scann_cfg.reorder_k.value(), bitset);
+
+                    // // todo aguzhva: bitset was here
+                    // index_->search_thread_safe(1, cur_query, k, distances + offset, ids + offset, nprobe,
+                    //                            scann_cfg.reorder_k.value(), bitset);
+
+                    // todo aguzhva: this is somewhat alogical. Refactor?
+                    faiss::IVFSearchParameters base_search_params;
+                    base_search_params.sel = id_selector;
+                    base_search_params.nprobe = nprobe;
+
+                    faiss::IndexScaNNSearchParameters scann_search_params;
+                    scann_search_params.base_index_params = &base_search_params;
+                    scann_search_params.reorder_k = scann_cfg.reorder_k.value();
+
+                    index_->search(1, cur_query, k, distances + offset, ids + offset, &scann_search_params);
                 } else {
                     auto cur_query = (const float*)data + index * dim;
                     if (is_cosine) {
                         copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         cur_query = copied_query.get();
                     }
-                    index_->search_thread_safe(1, cur_query, k, distances + offset, ids + offset, nprobe, 0, bitset);
+
+                    // // todo aguzhva: bitset was here
+                    // index_->search_thread_safe(1, cur_query, k, distances + offset, ids + offset, nprobe, 0, bitset);
+
+                    faiss::IVFSearchParameters ivf_search_params;
+                    ivf_search_params.nprobe = nprobe;
+                    ivf_search_params.max_codes = 0;
+                    ivf_search_params.sel = id_selector;
+
+                    index_->search(1, cur_query, k, distances + offset, ids + offset, &ivf_search_params);
                 }
             }));
         }
@@ -489,30 +538,69 @@ IvfIndexNode<T>::RangeSearch(const DataSet& dataset, const Config& cfg, const Bi
                 ThreadPool::ScopedOmpSetter setter(1);
                 faiss::RangeSearchResult res(1);
                 std::unique_ptr<float[]> copied_query = nullptr;
+
+                BitsetViewIDSelector bw_idselector(bitset);
+                faiss::IDSelector* id_selector = (bitset.empty()) ? nullptr : &bw_idselector;
+
                 if constexpr (std::is_same<T, faiss::IndexBinaryIVF>::value) {
                     auto cur_data = (const uint8_t*)xq + index * dim / 8;
-                    index_->range_search_thread_safe(1, cur_data, radius, &res, index_->nlist, bitset);
+                    // // todo aguzhva: bitset was here
+                    // index_->range_search_thread_safe(1, cur_data, radius, &res, index_->nlist, bitset);
+
+                    faiss::IVFSearchParameters ivf_search_params;
+                    ivf_search_params.nprobe = index_->nlist;
+                    ivf_search_params.sel = id_selector;
+
+                    index_->range_search(1, cur_data, radius, &res, &ivf_search_params);
                 } else if constexpr (std::is_same<T, faiss::IndexIVFFlat>::value) {
                     auto cur_query = (const float*)xq + index * dim;
                     if (is_cosine) {
                         copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         cur_query = copied_query.get();
                     }
-                    index_->range_search_thread_safe(1, cur_query, radius, &res, index_->nlist, 0, bitset);
+
+                    // // todo aguzhva: bitset was here
+                    // index_->range_search_thread_safe(1, cur_query, radius, &res, index_->nlist, 0, bitset);
+
+                    faiss::IVFSearchParameters ivf_search_params;
+                    ivf_search_params.nprobe = index_->nlist;
+                    ivf_search_params.max_codes = 0;
+                    ivf_search_params.sel = id_selector;
+
+                    index_->range_search(1, cur_query, radius, &res, &ivf_search_params);
                 } else if constexpr (std::is_same<T, faiss::IndexScaNN>::value) {
                     auto cur_query = (const float*)xq + index * dim;
                     if (is_cosine) {
                         copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         cur_query = copied_query.get();
                     }
-                    index_->range_search_thread_safe(1, cur_query, radius, &res, bitset);
+                    
+                    // // todo aguzhva: bitset was here
+                    // index_->range_search_thread_safe(1, cur_query, radius, &res, bitset);
+
+                    // todo aguzhva: this is somewhat alogical. Refactor?
+                    faiss::IVFSearchParameters base_search_params;
+                    base_search_params.sel = id_selector;
+
+                    faiss::IndexScaNNSearchParameters scann_search_params;
+                    scann_search_params.base_index_params = &base_search_params;
+
+                    index_->range_search(1, cur_query, radius, &res, &scann_search_params);
                 } else {
                     auto cur_query = (const float*)xq + index * dim;
                     if (is_cosine) {
                         copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         cur_query = copied_query.get();
                     }
-                    index_->range_search_thread_safe(1, cur_query, radius, &res, index_->nlist, 0, bitset);
+                    // // todo aguzhva: bitset was here
+                    // index_->range_search_thread_safe(1, cur_query, radius, &res, index_->nlist, 0, bitset);
+
+                    faiss::IVFSearchParameters ivf_search_params;
+                    ivf_search_params.nprobe = index_->nlist;
+                    ivf_search_params.max_codes = 0;
+                    ivf_search_params.sel = id_selector;
+
+                    index_->range_search(1, cur_query, radius, &res, &ivf_search_params);
                 }
                 auto elem_cnt = res.lims[1];
                 result_dist_array[index].resize(elem_cnt);

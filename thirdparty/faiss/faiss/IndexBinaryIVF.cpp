@@ -37,6 +37,16 @@ IndexBinaryIVF::IndexBinaryIVF(IndexBinary* quantizer, size_t d, size_t nlist)
     cp.niter = 10;
 }
 
+IndexBinaryIVF::IndexBinaryIVF(IndexBinary* quantizer, size_t d, size_t nlist, MetricType metric)
+        : IndexBinary(d, metric),
+          invlists(new ArrayInvertedLists(nlist, code_size)),
+          quantizer(quantizer),
+          nlist(nlist) {
+    FAISS_THROW_IF_NOT(d == quantizer->d);
+    is_trained = quantizer->is_trained && (quantizer->ntotal == nlist);
+    cp.niter = 10;
+}
+
 IndexBinaryIVF::IndexBinaryIVF() {}
 
 void IndexBinaryIVF::add(idx_t n, const uint8_t* x) {
