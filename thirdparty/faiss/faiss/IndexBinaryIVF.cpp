@@ -650,12 +650,10 @@ void search_knn_binary_dis_heap(
                 }
                 FAISS_THROW_IF_NOT_FMT(
                         key < (idx_t)ivf->nlist,
-                        "Invalid key=%" SCNd64 "  at ik=%ld nlist=%ld i=%ld n=%ld\n",
+                        "Invalid key=%" SCNd64 "  at ik=%ld nlist=%ld\n",
                         key,
                         ik,
-                        ivf->nlist,
-                        i,
-                        n);
+                        ivf->nlist);
 
                 scanner->set_list(key, (int32_t)coarse_dis[i * nprobe + ik]);
 
@@ -1073,7 +1071,7 @@ void IndexBinaryIVF::search_preassigned(
                     n,
                     x,
                     k,
-                    idx,
+                    cidx,
                     c_dis,
                     D,
                     idx,
