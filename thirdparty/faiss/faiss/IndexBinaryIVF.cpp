@@ -20,6 +20,7 @@
 #include <faiss/IndexLSH.h>
 #include <faiss/impl/AuxIndexStructures.h>
 #include <faiss/impl/FaissAssert.h>
+#include <faiss/utils/jaccard-inl.h>
 #include <faiss/utils/hamming.h>
 #include <faiss/utils/sorting.h>
 #include <faiss/utils/utils.h>
@@ -351,6 +352,7 @@ void IndexBinaryIVF::replace_invlists(InvertedLists* il, bool own) {
 
 namespace {
 
+// todo aguzhva: check whether templating store_pairs and use_sel makes sense
 template <class HammingComputer>
 struct IVFBinaryScannerL2 : BinaryInvertedListScanner {
     HammingComputer hc;
@@ -420,7 +422,8 @@ struct IVFBinaryScannerL2 : BinaryInvertedListScanner {
     }
 };
 
-template <class DistanceComputer, bool store_pairs>
+// todo aguzhva: check whether templating store_pairs and use_sel makes sense
+template <class DistanceComputer>
 struct IVFBinaryScannerJaccard : BinaryInvertedListScanner {
     DistanceComputer hc;
     size_t code_size;
@@ -985,11 +988,47 @@ struct BuildScanner {
     }
 };
 
+BinaryInvertedListScanner* select_IVFBinaryScannerJaccard(
+    size_t code_size, bool store_pairs, const IDSelector* sel) {
+#define HANDLE_CS(cs)                                                         \
+    case cs:                                                                  \
+        return new IVFBinaryScannerJaccard<JaccardComputer##cs>( \
+                cs, store_pairs, sel);
+    switch (code_size) {
+        HANDLE_CS(16)
+        HANDLE_CS(32)
+        HANDLE_CS(64)
+        HANDLE_CS(128)
+        HANDLE_CS(256)
+        HANDLE_CS(512)
+        default:
+            return new IVFBinaryScannerJaccard<
+                    JaccardComputerDefault>(code_size, store_pairs, sel);
+    }
+#undef HANDLE_CS
+}
+
 } // anonymous namespace
 
 BinaryInvertedListScanner* IndexBinaryIVF::get_InvertedListScanner(
         bool store_pairs,
         const IDSelector* sel) const {
+    switch (metric_type) {
+        case METRIC_Hamming:
+            // todo aguzhva: replaced with Faiss facility
+            BuildScanner bs;
+            return dispatch_HammingComputer(code_size, bs, code_size, store_pairs, sel);
+        case METRIC_Jaccard:
+            // todo aguzhva: check whether store_pairs makes sense
+            return select_IVFBinaryScannerJaccard(code_size, store_pairs, sel);
+        case METRIC_Substructure:
+        case METRIC_Superstructure:
+            // unsupported
+            return nullptr;
+        default:
+            return nullptr;
+    }
+
     BuildScanner bs;
     return dispatch_HammingComputer(code_size, bs, code_size, store_pairs, sel);
 }
@@ -1005,24 +1044,57 @@ void IndexBinaryIVF::search_preassigned(
         bool store_pairs,
         const IVFSearchParameters* params,
         IndexIVFStats* stats) const {
-    if (per_invlist_search) {
-        Run_search_knn_hamming_per_invlist r;
-        // clang-format off
-        dispatch_HammingComputer(
-                code_size, r, this, n, x, k,
-                cidx, cdis, dis, idx, store_pairs, params);
-        // clang-format on
-    } else if (use_heap) {
-        search_knn_hamming_heap(
-                this, n, x, k, cidx, cdis, dis, idx, store_pairs, params);
-    } else if (store_pairs) { // !use_heap && store_pairs
-        Run_search_knn_hamming_count<true> r;
-        dispatch_HammingComputer(
-                code_size, r, this, n, x, cidx, k, dis, idx, params);
-    } else { // !use_heap && !store_pairs
-        Run_search_knn_hamming_count<false> r;
-        dispatch_HammingComputer(
-                code_size, r, this, n, x, cidx, k, dis, idx, params);
+    if (metric_type == METRIC_Jaccard) {
+        if (use_heap) {
+            // todo aguzhva: replace with std::vector
+            float* D = new float[k * n];
+            float* c_dis = new float[n * nprobe];
+            // todo: this is an undefined behavior
+            memcpy(c_dis, cdis, sizeof(float) * n * nprobe);
+            search_knn_binary_dis_heap(
+                    this,
+                    n,
+                    x,
+                    k,
+                    idx,
+                    c_dis,
+                    D,
+                    idx,
+                    store_pairs,
+                    params);
+            memcpy(dis, D, sizeof(float) * n * k);
+            delete[] D;
+            delete[] c_dis;
+        } else {
+            // todo aguzhva: add throws
+            // not implemented
+        }
+    } else if (
+            metric_type == METRIC_Substructure ||
+            metric_type == METRIC_Superstructure) {
+        // todo aguzhva: add throws
+        // unsupported
+    } else {
+        // METRIC_Hamming
+        if (per_invlist_search) {
+            Run_search_knn_hamming_per_invlist r;
+            // clang-format off
+            dispatch_HammingComputer(
+                    code_size, r, this, n, x, k,
+                    cidx, cdis, dis, idx, store_pairs, params);
+            // clang-format on
+        } else if (use_heap) {
+            search_knn_hamming_heap(
+                    this, n, x, k, cidx, cdis, dis, idx, store_pairs, params);
+        } else if (store_pairs) { // !use_heap && store_pairs
+            Run_search_knn_hamming_count<true> r;
+            dispatch_HammingComputer(
+                    code_size, r, this, n, x, cidx, k, dis, idx, params);
+        } else { // !use_heap && !store_pairs
+            Run_search_knn_hamming_count<false> r;
+            dispatch_HammingComputer(
+                    code_size, r, this, n, x, cidx, k, dis, idx, params);
+        }
     }
 }
 
