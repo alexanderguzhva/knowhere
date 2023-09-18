@@ -398,7 +398,7 @@ struct IVFBinaryScannerL2 : BinaryInvertedListScanner {
             // // todo aguzhva: bitset was here
             // if (bitset.empty() || !bitset.test(ids[j])) {
             if (!this->sel || this->sel->is_member(ids[j])) {
-                uint32_t dis = hc.compute(codes);
+                auto dis = hc.compute(codes);
                 if (dis < simi[0]) {
                     idx_t id = store_pairs ? lo_build(list_no, j) : ids[j];
                     heap_replace_top<C>(k, simi, idxi, dis, id);
@@ -414,14 +414,14 @@ struct IVFBinaryScannerL2 : BinaryInvertedListScanner {
             size_t n,
             const uint8_t* __restrict codes,
             const idx_t* __restrict ids,
-            int radius,
+            float radius,
             RangeQueryResult& result) const override {
         size_t nup = 0;
         for (size_t j = 0; j < n; j++) {
             // // todo aguzhva: bitset was here
             // if (bitset.empty() || !bitset.test(ids[j])) {
             if (!this->sel || this->sel->is_member(ids[j])) {
-                uint32_t dis = hc.compute(codes);
+                auto dis = hc.compute(codes);
                 if (dis < radius) {
                     int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
                     result.add(dis, id);
@@ -462,6 +462,7 @@ struct IVFBinaryScannerJaccard : BinaryInvertedListScanner {
             idx_t* idxi,
             size_t k) const override {
         using C = CMax<float, idx_t>;
+        // todo aguzhva: this is a dirty hack in the baseline
         float* psimi = (float*)simi;
         size_t nup = 0;
         for (size_t j = 0; j < n; j++) {
@@ -484,7 +485,7 @@ struct IVFBinaryScannerJaccard : BinaryInvertedListScanner {
             size_t n,
             const uint8_t* codes,
             const idx_t* ids,
-            int radius,
+            float radius,
             RangeQueryResult& result) const override {
         for (size_t j = 0; j < n; j++) {
             // // todo aguzhva: bitset was here
@@ -649,10 +650,12 @@ void search_knn_binary_dis_heap(
                 }
                 FAISS_THROW_IF_NOT_FMT(
                         key < (idx_t)ivf->nlist,
-                        "Invalid key=%" SCNd64 "  at ik=%ld nlist=%ld\n",
+                        "Invalid key=%" SCNd64 "  at ik=%ld nlist=%ld i=%ld n=%ld\n",
                         key,
                         ik,
-                        ivf->nlist);
+                        ivf->nlist,
+                        i,
+                        n);
 
                 scanner->set_list(key, (int32_t)coarse_dis[i * nprobe + ik]);
 
@@ -1115,7 +1118,7 @@ void IndexBinaryIVF::search_preassigned(
 void IndexBinaryIVF::range_search(
         idx_t n,
         const uint8_t* __restrict x,
-        int radius,
+        float radius,
         RangeSearchResult* __restrict res,
         const SearchParameters* params_in) const {
     const IVFSearchParameters* params = nullptr;
@@ -1154,7 +1157,7 @@ void IndexBinaryIVF::range_search(
 void IndexBinaryIVF::range_search_preassigned(
         idx_t n,
         const uint8_t* __restrict x,
-        int radius,
+        float radius,
         const idx_t* __restrict assign,
         const int32_t* __restrict centroid_dis,
         RangeSearchResult* __restrict res,

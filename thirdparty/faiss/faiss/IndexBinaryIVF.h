@@ -143,17 +143,19 @@ struct IndexBinaryIVF : IndexBinary {
             idx_t* labels,
             const SearchParameters* params = nullptr) const override;
 
+    // todo aguzhva: radius because of the jaccard distance
     void range_search(
             idx_t n,
             const uint8_t* x,
-            int radius,
+            float radius,
             RangeSearchResult* result,
             const SearchParameters* params = nullptr) const override;
 
+    // todo aguzhva: radius because of the jaccard distance
     void range_search_preassigned(
             idx_t n,
             const uint8_t* x,
-            int radius,
+            float radius,
             const idx_t* assign,
             const int32_t* centroid_dis,
             RangeSearchResult* result,
@@ -257,8 +259,6 @@ struct BinaryInvertedListScanner {
      * @param labels     heap labels (size k)
      * @param k          heap size
      */
-    // todo aguzhva: InvertedListsScanner has
-    //   const IDSelector* field;
     virtual size_t scan_codes(
             size_t n,
             const uint8_t* codes,
@@ -267,13 +267,12 @@ struct BinaryInvertedListScanner {
             idx_t* labels,
             size_t k) const = 0;
 
-    // todo aguzhva: InvertedListsScanner has
-    //   const IDSelector* field;
+    // todo aguzhva: radius because of the jaccard distance
     virtual void scan_codes_range(
             size_t n,
             const uint8_t* codes,
             const idx_t* ids,
-            int radius,
+            float radius,
             RangeQueryResult& result) const = 0;
 
     virtual ~BinaryInvertedListScanner() {}

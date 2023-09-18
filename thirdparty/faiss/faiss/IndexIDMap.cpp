@@ -143,7 +143,7 @@ template <typename IndexT>
 void IndexIDMapTemplate<IndexT>::range_search(
         idx_t n,
         const typename IndexT::component_t* x,
-        typename IndexT::distance_t radius,
+        float radius,
         RangeSearchResult* result,
         const SearchParameters* params) const {
     FAISS_THROW_IF_NOT_MSG(

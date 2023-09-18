@@ -109,7 +109,7 @@ struct FlipEnumerator {
 };
 
 struct RangeSearchResults {
-    int radius;
+    float radius;
     RangeQueryResult& qres;
 
     inline void add(float dis, idx_t id) {
@@ -166,7 +166,7 @@ void search_single_query_template(
         } else {
             const uint8_t* codes = il.vecs.data();
             for (size_t i = 0; i < nv; i++) {
-                int dis = hc.compute(codes);
+                auto dis = hc.compute(codes);
                 res.add(dis, il.ids[i]);
                 codes += code_size;
             }
@@ -202,7 +202,7 @@ void search_single_query(
 void IndexBinaryHash::range_search(
         idx_t n,
         const uint8_t* x,
-        int radius,
+        float radius,
         RangeSearchResult* result,
         const SearchParameters* params) const {
     FAISS_THROW_IF_NOT_MSG(
@@ -348,7 +348,7 @@ static void verify_shortlist(
     const uint8_t* codes = index->xb.data();
 
     for (auto i : shortlist) {
-        int dis = hc.compute(codes + i * code_size);
+        auto dis = hc.compute(codes + i * code_size);
         res.add(dis, i);
     }
 }
@@ -411,7 +411,7 @@ void search_1_query_multihash(
 void IndexBinaryMultiHash::range_search(
         idx_t n,
         const uint8_t* x,
-        int radius,
+        float radius,
         RangeSearchResult* result,
         const SearchParameters* params) const {
     FAISS_THROW_IF_NOT_MSG(

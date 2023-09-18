@@ -52,7 +52,7 @@ struct IndexBinaryFlat : IndexBinary {
     void range_search(
             idx_t n,
             const uint8_t* x,
-            int radius,
+            float radius,
             RangeSearchResult* result,
             const SearchParameters* params = nullptr) const override;
 
