@@ -1003,6 +1003,7 @@ void IndexIVF::search_and_reconstruct(
             std::min(nlist, params ? params->nprobe : this->nprobe);
     FAISS_THROW_IF_NOT(nprobe > 0);
 
+    // todo aguzhva: deprecate ScopeDeleter and ScopeDeleter1
     idx_t* idx = new idx_t[n * nprobe];
     ScopeDeleter<idx_t> del(idx);
     float* coarse_dis = new float[n * nprobe];

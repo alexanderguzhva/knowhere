@@ -303,10 +303,12 @@ IndexIVF* parse_IndexIVF(
     int d = quantizer->d;
 
     if (match("Flat")) {
-        return new IndexIVFFlat(get_q(), d, nlist, mt);
+        // todo aguzhva: added 'false' as 'is_cosine'
+        return new IndexIVFFlat(get_q(), d, nlist, false, mt);
     }
     if (match("FlatDedup")) {
-        return new IndexIVFFlatDedup(get_q(), d, nlist, mt);
+        // todo aguzhva: added 'false' as 'is_cosine'
+        return new IndexIVFFlatDedup(get_q(), d, nlist, false, mt);
     }
     if (match(sq_pattern)) {
         return new IndexIVFScalarQuantizer(

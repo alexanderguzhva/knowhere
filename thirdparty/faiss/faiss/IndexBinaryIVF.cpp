@@ -20,6 +20,7 @@
 #include <faiss/IndexLSH.h>
 #include <faiss/impl/AuxIndexStructures.h>
 #include <faiss/impl/FaissAssert.h>
+#include <faiss/utils/jaccard-inl.h>
 #include <faiss/utils/hamming.h>
 #include <faiss/utils/sorting.h>
 #include <faiss/utils/utils.h>
@@ -28,6 +29,16 @@ namespace faiss {
 
 IndexBinaryIVF::IndexBinaryIVF(IndexBinary* quantizer, size_t d, size_t nlist)
         : IndexBinary(d),
+          invlists(new ArrayInvertedLists(nlist, code_size)),
+          quantizer(quantizer),
+          nlist(nlist) {
+    FAISS_THROW_IF_NOT(d == quantizer->d);
+    is_trained = quantizer->is_trained && (quantizer->ntotal == nlist);
+    cp.niter = 10;
+}
+
+IndexBinaryIVF::IndexBinaryIVF(IndexBinary* quantizer, size_t d, size_t nlist, MetricType metric)
+        : IndexBinary(d, metric),
           invlists(new ArrayInvertedLists(nlist, code_size)),
           quantizer(quantizer),
           nlist(nlist) {
@@ -113,24 +124,39 @@ void IndexBinaryIVF::search(
         idx_t k,
         int32_t* distances,
         idx_t* labels,
-        const SearchParameters* params) const {
-    FAISS_THROW_IF_NOT_MSG(
-            !params, "search params not supported for this index");
+        const SearchParameters* params_in) const {
+    // todo aguzhva: this code is almost similar to IndexIVF::search().
+    //   find a way to merge.
+
     FAISS_THROW_IF_NOT(k > 0);
+    const IVFSearchParameters* params = nullptr;
+    const SearchParameters* quantizer_params = nullptr;
+    if (params_in) {
+        params = dynamic_cast<const IVFSearchParameters*>(params_in);
+        FAISS_THROW_IF_NOT_MSG(params, "IndexBinaryIVF params have incorrect type");
+        quantizer_params = params->quantizer_params;
+    }
+    const size_t nprobe =
+            std::min(nlist, params ? params->nprobe : this->nprobe);
     FAISS_THROW_IF_NOT(nprobe > 0);
 
-    const size_t nprobe = std::min(nlist, this->nprobe);
+
     std::unique_ptr<idx_t[]> idx(new idx_t[n * nprobe]);
     std::unique_ptr<int32_t[]> coarse_dis(new int32_t[n * nprobe]);
 
     double t0 = getmillisecs();
-    quantizer->search(n, x, nprobe, coarse_dis.get(), idx.get());
+    quantizer->search(
+            n,
+            x,
+            nprobe,
+            coarse_dis.get(),
+            idx.get(),
+            quantizer_params);
     indexIVF_stats.quantization_time += getmillisecs() - t0;
 
     t0 = getmillisecs();
     invlists->prefetch_lists(idx.get(), n * nprobe);
 
-    // todo aguzhva: pass search params to search_preassigned
     search_preassigned(
             n, 
             x, 
@@ -139,7 +165,9 @@ void IndexBinaryIVF::search(
             coarse_dis.get(), 
             distances, 
             labels, 
-            false);
+            false,
+            params,
+            &indexIVF_stats);
     indexIVF_stats.search_time += getmillisecs() - t0;
 }
 
@@ -174,17 +202,24 @@ void IndexBinaryIVF::search_and_reconstruct(
         int32_t* __restrict distances,
         idx_t* __restrict labels,
         uint8_t* __restrict recons,
-        const SearchParameters* params) const {
-    FAISS_THROW_IF_NOT_MSG(
-            !params, "search params not supported for this index");
-    const size_t nprobe = std::min(nlist, this->nprobe);
-    FAISS_THROW_IF_NOT(k > 0);
+        const SearchParameters* params_in) const {
+    const IVFSearchParameters* params = nullptr;
+    const SearchParameters* quantizer_params = nullptr;
+    if (params_in) {
+        params = dynamic_cast<const IVFSearchParameters*>(params_in);
+        FAISS_THROW_IF_NOT_MSG(params, "IndexBinaryIVF params have incorrect type");
+        quantizer_params = params->quantizer_params;
+    }
+    const size_t nprobe =
+            std::min(nlist, params ? params->nprobe : this->nprobe);
     FAISS_THROW_IF_NOT(nprobe > 0);
+
+    FAISS_THROW_IF_NOT(k > 0);
 
     std::unique_ptr<idx_t[]> idx(new idx_t[n * nprobe]);
     std::unique_ptr<int32_t[]> coarse_dis(new int32_t[n * nprobe]);
 
-    quantizer->search(n, x, nprobe, coarse_dis.get(), idx.get());
+    quantizer->search(n, x, nprobe, coarse_dis.get(), idx.get(), quantizer_params);
 
     invlists->prefetch_lists(idx.get(), n * nprobe);
 
@@ -198,7 +233,8 @@ void IndexBinaryIVF::search_and_reconstruct(
             coarse_dis.get(),
             distances,
             labels,
-            /* store_pairs */ true);
+            /* store_pairs */ true,
+            params);
     for (idx_t i = 0; i < n; ++i) {
         for (idx_t j = 0; j < k; ++j) {
             idx_t ij = i * k + j;
@@ -208,8 +244,8 @@ void IndexBinaryIVF::search_and_reconstruct(
                 // Fill with NaNs
                 memset(reconstructed, -1, sizeof(*reconstructed) * d);
             } else {
-                int list_no = key >> 32;
-                int offset = key & 0xffffffff;
+                int list_no = lo_listno(key);
+                int offset = lo_offset(key);
 
                 // Update label to the actual id
                 labels[ij] = invlists->get_single_id(list_no, offset);
@@ -267,7 +303,7 @@ void IndexBinaryIVF::train(idx_t n, const uint8_t* x) {
                     "IVF not to support Substructure and Superstructure.");
         } else {
             index_tmp = IndexFlat(d, METRIC_L2);
-}
+        }
 
         if (clustering_index && verbose) {
             printf("using clustering_index of dimension %d to do the clustering\n",
@@ -326,6 +362,7 @@ void IndexBinaryIVF::replace_invlists(InvertedLists* il, bool own) {
 
 namespace {
 
+// todo aguzhva: check whether templating store_pairs and use_sel makes sense
 template <class HammingComputer>
 struct IVFBinaryScannerL2 : BinaryInvertedListScanner {
     HammingComputer hc;
@@ -395,7 +432,8 @@ struct IVFBinaryScannerL2 : BinaryInvertedListScanner {
     }
 };
 
-template <class DistanceComputer, bool store_pairs>
+// todo aguzhva: check whether templating store_pairs and use_sel makes sense
+template <class DistanceComputer>
 struct IVFBinaryScannerJaccard : BinaryInvertedListScanner {
     DistanceComputer hc;
     size_t code_size;
@@ -446,7 +484,7 @@ struct IVFBinaryScannerJaccard : BinaryInvertedListScanner {
             size_t n,
             const uint8_t* codes,
             const idx_t* ids,
-            float radius,
+            int radius,
             RangeQueryResult& result) const override {
         for (size_t j = 0; j < n; j++) {
             // // todo aguzhva: bitset was here
@@ -960,11 +998,47 @@ struct BuildScanner {
     }
 };
 
+BinaryInvertedListScanner* select_IVFBinaryScannerJaccard(
+    size_t code_size, bool store_pairs, const IDSelector* sel) {
+#define HANDLE_CS(cs)                                                         \
+    case cs:                                                                  \
+        return new IVFBinaryScannerJaccard<JaccardComputer##cs>( \
+                cs, store_pairs, sel);
+    switch (code_size) {
+        HANDLE_CS(16)
+        HANDLE_CS(32)
+        HANDLE_CS(64)
+        HANDLE_CS(128)
+        HANDLE_CS(256)
+        HANDLE_CS(512)
+        default:
+            return new IVFBinaryScannerJaccard<
+                    JaccardComputerDefault>(code_size, store_pairs, sel);
+    }
+#undef HANDLE_CS
+}
+
 } // anonymous namespace
 
 BinaryInvertedListScanner* IndexBinaryIVF::get_InvertedListScanner(
         bool store_pairs,
         const IDSelector* sel) const {
+    switch (metric_type) {
+        case METRIC_Hamming:
+            // todo aguzhva: replaced with Faiss facility
+            BuildScanner bs;
+            return dispatch_HammingComputer(code_size, bs, code_size, store_pairs, sel);
+        case METRIC_Jaccard:
+            // todo aguzhva: check whether store_pairs makes sense
+            return select_IVFBinaryScannerJaccard(code_size, store_pairs, sel);
+        case METRIC_Substructure:
+        case METRIC_Superstructure:
+            // unsupported
+            return nullptr;
+        default:
+            return nullptr;
+    }
+
     BuildScanner bs;
     return dispatch_HammingComputer(code_size, bs, code_size, store_pairs, sel);
 }
@@ -978,25 +1052,59 @@ void IndexBinaryIVF::search_preassigned(
         int32_t* dis,
         idx_t* idx,
         bool store_pairs,
-        const IVFSearchParameters* params) const {
-    if (per_invlist_search) {
-        Run_search_knn_hamming_per_invlist r;
-        // clang-format off
-        dispatch_HammingComputer(
-                code_size, r, this, n, x, k,
-                cidx, cdis, dis, idx, store_pairs, params);
-        // clang-format on
-    } else if (use_heap) {
-        search_knn_hamming_heap(
-                this, n, x, k, cidx, cdis, dis, idx, store_pairs, params);
-    } else if (store_pairs) { // !use_heap && store_pairs
-        Run_search_knn_hamming_count<true> r;
-        dispatch_HammingComputer(
-                code_size, r, this, n, x, cidx, k, dis, idx, params);
-    } else { // !use_heap && !store_pairs
-        Run_search_knn_hamming_count<false> r;
-        dispatch_HammingComputer(
-                code_size, r, this, n, x, cidx, k, dis, idx, params);
+        const IVFSearchParameters* params,
+        IndexIVFStats* stats) const {
+    if (metric_type == METRIC_Jaccard) {
+        if (use_heap) {
+            // todo aguzhva: replace with std::vector
+            float* D = new float[k * n];
+            float* c_dis = new float[n * nprobe];
+            // todo: this is an undefined behavior
+            memcpy(c_dis, cdis, sizeof(float) * n * nprobe);
+            search_knn_binary_dis_heap(
+                    this,
+                    n,
+                    x,
+                    k,
+                    idx,
+                    c_dis,
+                    D,
+                    idx,
+                    store_pairs,
+                    params);
+            memcpy(dis, D, sizeof(float) * n * k);
+            delete[] D;
+            delete[] c_dis;
+        } else {
+            // todo aguzhva: add throws
+            // not implemented
+        }
+    } else if (
+            metric_type == METRIC_Substructure ||
+            metric_type == METRIC_Superstructure) {
+        // todo aguzhva: add throws
+        // unsupported
+    } else {
+        // METRIC_Hamming
+        if (per_invlist_search) {
+            Run_search_knn_hamming_per_invlist r;
+            // clang-format off
+            dispatch_HammingComputer(
+                    code_size, r, this, n, x, k,
+                    cidx, cdis, dis, idx, store_pairs, params);
+            // clang-format on
+        } else if (use_heap) {
+            search_knn_hamming_heap(
+                    this, n, x, k, cidx, cdis, dis, idx, store_pairs, params);
+        } else if (store_pairs) { // !use_heap && store_pairs
+            Run_search_knn_hamming_count<true> r;
+            dispatch_HammingComputer(
+                    code_size, r, this, n, x, cidx, k, dis, idx, params);
+        } else { // !use_heap && !store_pairs
+            Run_search_knn_hamming_count<false> r;
+            dispatch_HammingComputer(
+                    code_size, r, this, n, x, cidx, k, dis, idx, params);
+        }
     }
 }
 
@@ -1005,21 +1113,35 @@ void IndexBinaryIVF::range_search(
         const uint8_t* __restrict x,
         int radius,
         RangeSearchResult* __restrict res,
-        const SearchParameters* params) const {
-    FAISS_THROW_IF_NOT_MSG(
-            !params, "search params not supported for this index");
+        const SearchParameters* params_in) const {
+    const IVFSearchParameters* params = nullptr;
+    const SearchParameters* quantizer_params = nullptr;
+    if (params_in) {
+        params = dynamic_cast<const IVFSearchParameters*>(params_in);
+        FAISS_THROW_IF_NOT_MSG(params, "IndexBinaryIVF params have incorrect type");
+        quantizer_params = params->quantizer_params;
+    }
     const size_t nprobe = std::min(nlist, this->nprobe);
     std::unique_ptr<idx_t[]> idx(new idx_t[n * nprobe]);
     std::unique_ptr<int32_t[]> coarse_dis(new int32_t[n * nprobe]);
 
     double t0 = getmillisecs();
-    quantizer->search(n, x, nprobe, coarse_dis.get(), idx.get());
+    quantizer->search(
+            n, x, nprobe, coarse_dis.get(), idx.get(), quantizer_params);
     indexIVF_stats.quantization_time += getmillisecs() - t0;
 
     t0 = getmillisecs();
     invlists->prefetch_lists(idx.get(), n * nprobe);
 
-    range_search_preassigned(n, x, radius, idx.get(), coarse_dis.get(), res, params);
+    range_search_preassigned(
+            n, 
+            x, 
+            radius, 
+            idx.get(), 
+            coarse_dis.get(), 
+            res, 
+            params, 
+            &indexIVF_stats);
 
     indexIVF_stats.search_time += getmillisecs() - t0;
 }
@@ -1031,8 +1153,12 @@ void IndexBinaryIVF::range_search_preassigned(
         const idx_t* __restrict assign,
         const int32_t* __restrict centroid_dis,
         RangeSearchResult* __restrict res,
-        const SearchParameters* params) const {
-    const size_t nprobe = std::min(nlist, this->nprobe);
+        const IVFSearchParameters* params,
+        IndexIVFStats* stats) const {
+    idx_t nprobe = params ? params->nprobe : this->nprobe;
+    nprobe = std::min((idx_t)nlist, nprobe);
+    FAISS_THROW_IF_NOT(nprobe > 0);
+
     bool store_pairs = false;
     size_t nlistv = 0, ndis = 0;
 

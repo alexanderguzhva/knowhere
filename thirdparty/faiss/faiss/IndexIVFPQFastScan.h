@@ -40,6 +40,7 @@ struct IndexIVFPQFastScan : IndexIVFFastScan {
     /// if use_precompute_table size (nlist, pq.M, pq.ksub)
     AlignedTable<float> precomputed_table;
 
+    // // todo aguzhva: get rid of this
     bool is_cosine_ = false;
     std::vector<float> norms;
 
@@ -60,7 +61,11 @@ struct IndexIVFPQFastScan : IndexIVFFastScan {
 
     void train_encoder(idx_t n, const float* x, const idx_t* assign) override;
 
+    void train(idx_t n, const float* x) override;
+
     idx_t train_encoder_num_vectors() const override;
+
+    void add_with_ids(idx_t n, const float* x, const idx_t* xids) override;
 
     /// build precomputed table, possibly updating use_precomputed_table
     void precompute_table();
