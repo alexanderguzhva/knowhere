@@ -68,37 +68,43 @@ int64_t IndexScaNN::size() {
     return (capacity + centroid_table + precomputed_table + raw_data);
 }
 
-void IndexScaNN::search_thread_safe(
+void IndexScaNN::search(
         idx_t n,
         const float* x,
         idx_t k,
         float* distances,
         idx_t* labels,
-        const size_t nprobe,
-        const size_t reorder_k,
-        const BitsetView bitset) const {
+        const SearchParameters* params_in) const {
     FAISS_THROW_IF_NOT(k > 0);
-
     FAISS_THROW_IF_NOT(is_trained);
+
+    const IndexScaNNSearchParameters* params = nullptr;
+    if (params_in) {
+        params = dynamic_cast<const IndexScaNNSearchParameters*>(params_in);
+        FAISS_THROW_IF_NOT_MSG(params, "IndexScaNN params have incorrect type");
+    }
+
+    idx_t k_base = (params != nullptr) ? params->reorder_k : idx_t(k * k_factor);
+    SearchParameters* base_index_params = 
+        (params != nullptr) ? params->base_index_params : nullptr;
+
+    FAISS_THROW_IF_NOT(k_base >= k);
 
     auto base = dynamic_cast<const IndexIVFPQFastScan*>(base_index);
     FAISS_THROW_IF_NOT(base);
 
     // nothing to refine, directly return result
     if (refine_index == nullptr) {
-        base->search_thread_safe(
+        base->search(
             n,
             x,
             k,
             distances,
             labels,
-            nprobe,
-            bitset);
+            base_index_params);
         return;
     }
 
-    idx_t k_base = idx_t(reorder_k);
-    FAISS_THROW_IF_NOT(k_base >= k);
     idx_t* base_labels = labels;
     float* base_distances = distances;
     ScopeDeleter<idx_t> del1;
@@ -111,14 +117,13 @@ void IndexScaNN::search_thread_safe(
         del2.set(base_distances);
     }
 
-    base->search_thread_safe(
+    base->search(
             n,
             x,
             k_base,
             base_distances,
             base_labels,
-            nprobe,
-            bitset);
+            base_index_params);
     for (idx_t i = 0; i < n * k_base; i++)
         assert(base_labels[i] >= -1 && base_labels[i] < ntotal);
 
@@ -150,19 +155,34 @@ void IndexScaNN::search_thread_safe(
     }
 }
 
-void IndexScaNN::range_search_thread_safe(
+void IndexScaNN::range_search(
         idx_t n,
         const float* x,
         float radius,
         RangeSearchResult* result,
-        const BitsetView bitset) const {
+        const SearchParameters* params_in) const {
     FAISS_THROW_IF_NOT(n == 1);  // currently knowhere will split nq to 1
 
     FAISS_THROW_IF_NOT(is_trained);
+
+    const IndexScaNNSearchParameters* params = nullptr;
+    if (params_in) {
+        params = dynamic_cast<const IndexScaNNSearchParameters*>(params_in);
+        FAISS_THROW_IF_NOT_MSG(params, "IndexScaNN params have incorrect type");
+    }
+
+    SearchParameters* base_index_params = 
+        (params != nullptr) ? params->base_index_params : nullptr;
+
+
     auto base = dynamic_cast<const IndexIVFPQFastScan*>(base_index);
     FAISS_THROW_IF_NOT(base);
 
-    base->range_search_thread_safe(n, x, radius, result, base->nlist, bitset);
+    IVFSearchParameters ivf_search_params;
+    ivf_search_params.nprobe = base->nlist;
+    // todo aguzhva: this is somewhat hacky
+    ivf_search_params.sel = base_index_params->sel;
+    base->range_search(n, x, radius, result, &ivf_search_params);
 
     // nothing to refine, directly return the result
     if (refine_index == nullptr) {

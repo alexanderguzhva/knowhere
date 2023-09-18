@@ -40,6 +40,7 @@ struct IndexIVFPQFastScan : IndexIVFFastScan {
     /// if use_precompute_table size (nlist, pq.M, pq.ksub)
     AlignedTable<float> precomputed_table;
 
+    // todo: get rid of this
     bool is_cosine_ = false;
     std::vector<float> norms;
 

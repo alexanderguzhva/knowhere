@@ -127,7 +127,8 @@ struct IndexBinaryIVF : IndexBinary {
             int32_t* distances,
             idx_t* labels,
             bool store_pairs,
-            const IVFSearchParameters* params = nullptr) const;
+            const IVFSearchParameters* params = nullptr,
+            IndexIVFStats* stats = nullptr) const;
 
     virtual BinaryInvertedListScanner* get_InvertedListScanner(
             bool store_pairs = false,
@@ -141,15 +142,6 @@ struct IndexBinaryIVF : IndexBinary {
             int32_t* distances,
             idx_t* labels,
             const SearchParameters* params = nullptr) const override;
-
-    void search_thread_safe(
-            idx_t n,
-            const uint8_t* x,
-            idx_t k,
-            int32_t* distances,
-            idx_t* labels,
-            size_t nprobe,
-            const SearchParameters* params = nullptr) const;
 
     void range_search(
             idx_t n,
@@ -165,7 +157,8 @@ struct IndexBinaryIVF : IndexBinary {
             const idx_t* assign,
             const int32_t* centroid_dis,
             RangeSearchResult* result,
-            const SearchParameters* params = nullptr) const;
+            const IVFSearchParameters* params = nullptr,
+            IndexIVFStats* stats = nullptr) const;
 
     void reconstruct(idx_t key, uint8_t* recons) const override;
 
@@ -197,16 +190,6 @@ struct IndexBinaryIVF : IndexBinary {
             idx_t* labels,
             uint8_t* recons,
             const SearchParameters* params = nullptr) const override;
-
-    void search_and_reconstruct_thread_safe(
-            idx_t n,
-            const uint8_t* x,
-            idx_t k,
-            int32_t* distances,
-            idx_t* labels,
-            uint8_t* recons,
-            size_t nprobe,
-            const SearchParameters* params = nullptr) const;
 
     /** Reconstruct a vector given the location in terms of (inv list index +
      * inv list offset) instead of the id.
@@ -243,32 +226,6 @@ struct IndexBinaryIVF : IndexBinary {
 
     void replace_invlists(InvertedLists* il, bool own = false);
 
-    void range_search_thread_safe(
-            idx_t n,
-            const uint8_t* x,
-            int radius,
-            RangeSearchResult* res,
-            const SearchParameters* params = nullptr) const;
-
-    void range_search_preassigned_thread_safe(
-            idx_t n,
-            const uint8_t* x,
-            int radius,
-            const idx_t* assign,
-            const int32_t* centroid_dis,
-            RangeSearchResult* res,
-            const SearchParameters* params = nullptr) const;
-
-    void search_preassigned_thread_safe(
-            idx_t n,
-            const uint8_t* x,
-            idx_t k,
-            const idx_t* idx,
-            const int32_t* coarse_dis,
-            int32_t* distances,
-            idx_t* labels,
-            bool store_pairs,
-            const IVFSearchParameters* params = nullptr) const;
 };
 
 struct BinaryInvertedListScanner {
