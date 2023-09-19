@@ -50,6 +50,7 @@
 #include <faiss/IndexRefine.h>
 #include <faiss/IndexRowwiseMinMax.h>
 #include <faiss/IndexScalarQuantizer.h>
+#include <faiss/IndexScaNN.h>
 #include <faiss/MetaIndexes.h>
 #include <faiss/VectorTransform.h>
 
@@ -1095,10 +1096,29 @@ Index* read_index(IOReader* f, int io_flags) {
             idxrf->refine_index = read_index(f, io_flags);
             if (dynamic_cast<IndexFlat*>(idxrf->refine_index)) {
                 // then make a RefineFlat with it
-                IndexRefine* idxrf_old = idxrf;
-                idxrf = new IndexRefineFlat();
-                *idxrf = *idxrf_old;
-                delete idxrf_old;
+
+                // todo aguzhva: due to a bug in baseline knowhere implementation,
+                //   we have to explicitly construct IndexScaNN object, because
+                //   index_write() call does not recognize IndexScaNN as a special
+                //   case
+                if (dynamic_cast<IndexIVFPQFastScan*>(idxrf->base_index)) {
+                    // this is IndexScaNN
+
+                    // todo aguzhva: warning, this is C++ object slicing
+                    IndexRefine* idxrf_old = idxrf;
+                    idxrf = new IndexScaNN();
+                    *idxrf = *idxrf_old;
+                    delete idxrf_old;
+                }
+                else {
+                    // the default faiss case
+
+                    // todo aguzhva: warning, this is C++ object slicing
+                    IndexRefine* idxrf_old = idxrf;
+                    idxrf = new IndexRefineFlat();
+                    *idxrf = *idxrf_old;
+                    delete idxrf_old;
+                }
             }
         } else {
             idxrf->refine_index = nullptr;

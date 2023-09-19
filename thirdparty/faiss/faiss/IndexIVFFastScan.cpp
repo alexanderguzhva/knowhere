@@ -228,6 +228,7 @@ void estimators_from_tables_generic(
         }
 
         if (C::cmp(heap_dis[0], dis)) {
+            // todo aguzhva: heap_replace_top
             heap_pop<C>(k, heap_dis, heap_ids);
             heap_push<C>(k, heap_dis, heap_ids, dis, ids[j]);
         }
@@ -307,16 +308,20 @@ void IndexIVFFastScan::search(
         idx_t k,
         float* distances,
         idx_t* labels,
-        const SearchParameters* params) const {
-    FAISS_THROW_IF_NOT_MSG(
-            !params, "search params not supported for this index");
+        const SearchParameters* params_in) const {
+    const IVFSearchParameters* params = nullptr;
+    if (params_in) {
+        params = dynamic_cast<const IVFSearchParameters*>(params_in);
+        FAISS_THROW_IF_NOT_MSG(params, "IndexIVFFastScan params have incorrect type");
+    }
+    
     FAISS_THROW_IF_NOT(k > 0);
 
     DummyScaler scaler;
     if (metric_type == METRIC_L2) {
-        search_dispatch_implem<true>(n, x, k, distances, labels, scaler);
+        search_dispatch_implem<true>(n, x, k, distances, labels, scaler, params);
     } else {
-        search_dispatch_implem<false>(n, x, k, distances, labels, scaler);
+        search_dispatch_implem<false>(n, x, k, distances, labels, scaler, params);
     }
 }
 
@@ -336,7 +341,10 @@ void IndexIVFFastScan::search_dispatch_implem(
         idx_t k,
         float* distances,
         idx_t* labels,
-        const Scaler& scaler) const {
+        const Scaler& scaler,
+        const IVFSearchParameters* params) const {
+    const idx_t nprobe = params ? params->nprobe : this->nprobe;
+
     using Cfloat = typename std::conditional<
             is_max,
             CMax<float, int64_t>,
@@ -366,9 +374,9 @@ void IndexIVFFastScan::search_dispatch_implem(
     }
 
     if (impl == 1) {
-        search_implem_1<Cfloat>(n, x, k, distances, labels, scaler);
+        search_implem_1<Cfloat>(n, x, k, distances, labels, scaler, params);
     } else if (impl == 2) {
-        search_implem_2<C>(n, x, k, distances, labels, scaler);
+        search_implem_2<C>(n, x, k, distances, labels, scaler, params);
 
     } else if (impl >= 10 && impl <= 15) {
         size_t ndis = 0, nlist_visited = 0;
@@ -384,9 +392,10 @@ void IndexIVFFastScan::search_dispatch_implem(
                         impl,
                         &ndis,
                         &nlist_visited,
-                        scaler);
+                        scaler,
+                        params);
             } else if (impl == 14 || impl == 15) {
-                search_implem_14<C>(n, x, k, distances, labels, impl, scaler);
+                search_implem_14<C>(n, x, k, distances, labels, impl, scaler, params);
             } else {
                 search_implem_10<C>(
                         n,
@@ -397,7 +406,8 @@ void IndexIVFFastScan::search_dispatch_implem(
                         impl,
                         &ndis,
                         &nlist_visited,
-                        scaler);
+                        scaler,
+                        params);
             }
         } else {
             // explicitly slice over threads
@@ -423,7 +433,7 @@ void IndexIVFFastScan::search_dispatch_implem(
             if (impl == 14 ||
                 impl == 15) { // this might require slicing if there are too
                               // many queries (for now we keep this simple)
-                search_implem_14<C>(n, x, k, distances, labels, impl, scaler);
+                search_implem_14<C>(n, x, k, distances, labels, impl, scaler, params);
             } else {
 #pragma omp parallel for reduction(+ : ndis, nlist_visited)
                 for (int slice = 0; slice < nslice; slice++) {
@@ -441,7 +451,8 @@ void IndexIVFFastScan::search_dispatch_implem(
                                 impl,
                                 &ndis,
                                 &nlist_visited,
-                                scaler);
+                                scaler,
+                                params);
                     } else {
                         search_implem_10<C>(
                                 i1 - i0,
@@ -452,7 +463,8 @@ void IndexIVFFastScan::search_dispatch_implem(
                                 impl,
                                 &ndis,
                                 &nlist_visited,
-                                scaler);
+                                scaler,
+                                params);
                     }
                 }
             }
@@ -472,13 +484,19 @@ void IndexIVFFastScan::search_implem_1(
         idx_t k,
         float* distances,
         idx_t* labels,
-        const Scaler& scaler) const {
+        const Scaler& scaler,
+        const IVFSearchParameters* params) const {
     FAISS_THROW_IF_NOT(orig_invlists);
+
+    const size_t nprobe = params ? params->nprobe : this->nprobe;
+    const size_t max_codes = params ? params->max_codes : this->max_codes;
+    const IDSelector* sel = params ? params->sel : nullptr;
+    const SearchParameters* quantizer_params = params ? params->quantizer_params : nullptr;
 
     std::unique_ptr<idx_t[]> coarse_ids(new idx_t[n * nprobe]);
     std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
 
-    quantizer->search(n, x, nprobe, coarse_dis.get(), coarse_ids.get());
+    quantizer->search(n, x, nprobe, coarse_dis.get(), coarse_ids.get(), quantizer_params);
 
     size_t dim12 = ksub * M;
     AlignedTable<float> dis_tables;
@@ -543,13 +561,19 @@ void IndexIVFFastScan::search_implem_2(
         idx_t k,
         float* distances,
         idx_t* labels,
-        const Scaler& scaler) const {
+        const Scaler& scaler,
+        const IVFSearchParameters* params) const {
     FAISS_THROW_IF_NOT(orig_invlists);
+
+    const size_t nprobe = params ? params->nprobe : this->nprobe;
+    const size_t max_codes = params ? params->max_codes : this->max_codes;
+    const IDSelector* sel = params ? params->sel : nullptr;
+    const SearchParameters* quantizer_params = params ? params->quantizer_params : nullptr;
 
     std::unique_ptr<idx_t[]> coarse_ids(new idx_t[n * nprobe]);
     std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
 
-    quantizer->search(n, x, nprobe, coarse_dis.get(), coarse_ids.get());
+    quantizer->search(n, x, nprobe, coarse_dis.get(), coarse_ids.get(), quantizer_params);
 
     size_t dim12 = ksub * M2;
     AlignedTable<uint8_t> dis_tables;
@@ -639,7 +663,14 @@ void IndexIVFFastScan::search_implem_10(
         int impl,
         size_t* ndis_out,
         size_t* nlist_out,
-        const Scaler& scaler) const {
+        const Scaler& scaler,
+        const IVFSearchParameters* params) const {
+
+    const size_t nprobe = params ? params->nprobe : this->nprobe;
+    const size_t max_codes = params ? params->max_codes : this->max_codes;
+    const IDSelector* sel = params ? params->sel : nullptr;
+    const SearchParameters* quantizer_params = params ? params->quantizer_params : nullptr;
+
     memset(distances, -1, sizeof(float) * k * n);
     memset(labels, -1, sizeof(idx_t) * k * n);
 
@@ -656,7 +687,7 @@ void IndexIVFFastScan::search_implem_10(
 #define TIC times[ti++] = get_cy()
     TIC;
 
-    quantizer->search(n, x, nprobe, coarse_dis.get(), coarse_ids.get());
+    quantizer->search(n, x, nprobe, coarse_dis.get(), coarse_ids.get(), quantizer_params);
 
     TIC;
 
@@ -689,12 +720,12 @@ void IndexIVFFastScan::search_implem_10(
             std::unique_ptr<SIMDResultHandler<C, true>> handler;
 
             if (k == 1) {
-                handler.reset(new SingleResultHC(1, 0));
+                handler.reset(new SingleResultHC(1, 0, sel));
             } else if (impl == 10) {
                 handler.reset(new HeapHC(
-                        1, tmp_distances.get(), labels + i * k, k, 0));
+                        1, tmp_distances.get(), labels + i * k, k, 0, sel));
             } else if (impl == 11) {
-                handler.reset(new ReservoirHC(1, 0, k, 2 * k));
+                handler.reset(new ReservoirHC(1, 0, k, 2 * k, sel));
             } else {
                 FAISS_THROW_MSG("invalid");
             }
@@ -760,11 +791,17 @@ void IndexIVFFastScan::search_implem_12(
         int impl,
         size_t* ndis_out,
         size_t* nlist_out,
-        const Scaler& scaler) const {
+        const Scaler& scaler,
+        const IVFSearchParameters* params) const {
     if (n == 0) { // does not work well with reservoir
         return;
     }
     FAISS_THROW_IF_NOT(bbs == 32);
+
+    const size_t nprobe = params ? params->nprobe : this->nprobe;
+    const size_t max_codes = params ? params->max_codes : this->max_codes;
+    const IDSelector* sel = params ? params->sel : nullptr;
+    const SearchParameters* quantizer_params = params ? params->quantizer_params : nullptr;
 
     std::unique_ptr<idx_t[]> coarse_ids(new idx_t[n * nprobe]);
     std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
@@ -775,7 +812,7 @@ void IndexIVFFastScan::search_implem_12(
 #define TIC times[ti++] = get_cy()
     TIC;
 
-    quantizer->search(n, x, nprobe, coarse_dis.get(), coarse_ids.get());
+    quantizer->search(n, x, nprobe, coarse_dis.get(), coarse_ids.get(), quantizer_params);
 
     TIC;
 
@@ -829,12 +866,12 @@ void IndexIVFFastScan::search_implem_12(
     using SingleResultHC = SingleResultHandler<C, true>;
 
     if (k == 1) {
-        handler.reset(new SingleResultHC(n, 0));
+        handler.reset(new SingleResultHC(n, 0, sel));
     } else if (impl == 12) {
         tmp_distances.resize(n * k);
-        handler.reset(new HeapHC(n, tmp_distances.get(), labels, k, 0));
+        handler.reset(new HeapHC(n, tmp_distances.get(), labels, k, 0, sel));
     } else if (impl == 13) {
-        handler.reset(new ReservoirHC(n, 0, k, 2 * k));
+        handler.reset(new ReservoirHC(n, 0, k, 2 * k, sel));
     }
 
     int qbs2 = this->qbs2 ? this->qbs2 : 11;
@@ -955,18 +992,24 @@ void IndexIVFFastScan::search_implem_14(
         float* distances,
         idx_t* labels,
         int impl,
-        const Scaler& scaler) const {
+        const Scaler& scaler,
+        const IVFSearchParameters* params) const {
     if (n == 0) { // does not work well with reservoir
         return;
     }
     FAISS_THROW_IF_NOT(bbs == 32);
+
+    const size_t nprobe = params ? params->nprobe : this->nprobe;
+    const size_t max_codes = params ? params->max_codes : this->max_codes;
+    const IDSelector* sel = params ? params->sel : nullptr;
+    const SearchParameters* quantizer_params = params ? params->quantizer_params : nullptr;
 
     std::unique_ptr<idx_t[]> coarse_ids(new idx_t[n * nprobe]);
     std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
 
     uint64_t ttg0 = get_cy();
 
-    quantizer->search(n, x, nprobe, coarse_dis.get(), coarse_ids.get());
+    quantizer->search(n, x, nprobe, coarse_dis.get(), coarse_ids.get(), quantizer_params);
 
     uint64_t ttg1 = get_cy();
     uint64_t coarse_search_tt = ttg1 - ttg0;
@@ -1092,13 +1135,13 @@ void IndexIVFFastScan::search_implem_14(
         using SingleResultHC = SingleResultHandler<C, true>;
 
         if (k == 1) {
-            handler.reset(new SingleResultHC(n, 0));
+            handler.reset(new SingleResultHC(n, 0, sel));
         } else if (impl == 14) {
             tmp_distances.resize(n * k);
             handler.reset(
-                    new HeapHC(n, tmp_distances.get(), local_idx.data(), k, 0));
+                    new HeapHC(n, tmp_distances.get(), local_idx.data(), k, 0, sel));
         } else if (impl == 15) {
-            handler.reset(new ReservoirHC(n, 0, k, 2 * k));
+            handler.reset(new ReservoirHC(n, 0, k, 2 * k, sel));
         }
 
         int qbs2 = this->qbs2 ? this->qbs2 : 11;
@@ -1281,7 +1324,8 @@ template void IndexIVFFastScan::search_dispatch_implem<true, NormTableScaler>(
         idx_t k,
         float* distances,
         idx_t* labels,
-        const NormTableScaler& scaler) const;
+        const NormTableScaler& scaler,
+        const IVFSearchParameters* params = nullptr) const;
 
 template void IndexIVFFastScan::search_dispatch_implem<false, NormTableScaler>(
         idx_t n,
@@ -1289,6 +1333,7 @@ template void IndexIVFFastScan::search_dispatch_implem<false, NormTableScaler>(
         idx_t k,
         float* distances,
         idx_t* labels,
-        const NormTableScaler& scaler) const;
+        const NormTableScaler& scaler,
+        const IVFSearchParameters* params = nullptr) const;
 
 } // namespace faiss

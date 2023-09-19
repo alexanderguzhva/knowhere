@@ -122,7 +122,8 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t k,
             float* distances,
             idx_t* labels,
-            const Scaler& scaler) const;
+            const Scaler& scaler,
+            const IVFSearchParameters* params = nullptr) const;
 
     template <class C, class Scaler>
     void search_implem_1(
@@ -131,7 +132,8 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t k,
             float* distances,
             idx_t* labels,
-            const Scaler& scaler) const;
+            const Scaler& scaler,
+            const IVFSearchParameters* params = nullptr) const;
 
     template <class C, class Scaler>
     void search_implem_2(
@@ -140,7 +142,8 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t k,
             float* distances,
             idx_t* labels,
-            const Scaler& scaler) const;
+            const Scaler& scaler,
+            const IVFSearchParameters* params = nullptr) const;
 
     // implem 10 and 12 are not multithreaded internally, so
     // export search stats
@@ -154,7 +157,8 @@ struct IndexIVFFastScan : IndexIVF {
             int impl,
             size_t* ndis_out,
             size_t* nlist_out,
-            const Scaler& scaler) const;
+            const Scaler& scaler,
+            const IVFSearchParameters* params = nullptr) const;
 
     template <class C, class Scaler>
     void search_implem_12(
@@ -166,7 +170,8 @@ struct IndexIVFFastScan : IndexIVF {
             int impl,
             size_t* ndis_out,
             size_t* nlist_out,
-            const Scaler& scaler) const;
+            const Scaler& scaler,
+            const IVFSearchParameters* params = nullptr) const;
 
     // implem 14 is multithreaded internally across nprobes and queries
     template <class C, class Scaler>
@@ -177,7 +182,8 @@ struct IndexIVFFastScan : IndexIVF {
             float* distances,
             idx_t* labels,
             int impl,
-            const Scaler& scaler) const;
+            const Scaler& scaler,
+            const IVFSearchParameters* params = nullptr) const;
 
     // reconstruct vectors from packed invlists
     void reconstruct_from_offset(int64_t list_no, int64_t offset, float* recons)

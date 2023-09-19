@@ -231,6 +231,8 @@ IndexRefineFlat::IndexRefineFlat(Index* base_index, const float* xb)
         with_raw_data = false;
     }
     own_refine_index = true;
+    // // todo aguzhva: baseline has the following line disabled, but faiss has it enabled
+    // refine_index->add(base_index->ntotal, xb);
 }
 
 IndexRefineFlat::IndexRefineFlat() : IndexRefine() {
