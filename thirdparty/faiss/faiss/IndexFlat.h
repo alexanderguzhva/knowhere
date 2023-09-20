@@ -18,7 +18,13 @@ namespace faiss {
 
 /** Index that stores the full vectors and performs exhaustive search */
 struct IndexFlat : IndexFlatCodes {
-    explicit IndexFlat(idx_t d, MetricType metric = METRIC_L2);
+    /// database vectors, size ntotal * d
+    std::vector<float> xb;
+
+    explicit IndexFlat(idx_t d, MetricType metric = METRIC_L2,
+                       bool is_cosine = false);
+
+    void add(idx_t n, const float* x) override;
 
     void search(
             idx_t n,
@@ -58,6 +64,13 @@ struct IndexFlat : IndexFlatCodes {
     }
     const float* get_xb() const {
         return (const float*)codes.data();
+    }
+
+    float* get_norms() {
+        return (float*)code_norms.data();
+    }
+    const float* get_norms() const {
+        return (const float*)code_norms.data();
     }
 
     IndexFlat() {}
