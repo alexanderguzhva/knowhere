@@ -83,7 +83,6 @@ struct IndexIVFFlatDedup : IndexIVFFlat {
             Index* quantizer,
             size_t d,
             size_t nlist_,
-            bool is_cosine,
             MetricType = METRIC_L2);
 
     /// also dedups the training set
