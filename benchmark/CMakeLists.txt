@@ -36,7 +36,7 @@ endif()
 macro(benchmark_test target file)
     set(FILE_SRCS ${file})
     add_executable(${target} ${FILE_SRCS})
-    target_link_libraries(${target} ${depend_libs} ${unittest_libs})
+    target_link_libraries(${target} ${depend_libs} ${unittest_libs} atomic)
     install(TARGETS ${target} DESTINATION unittest)
 endmacro()
 
