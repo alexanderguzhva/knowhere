@@ -28,7 +28,7 @@ namespace knowhere {
 template <typename T>
 class FlatIndexNode : public IndexNode {
  public:
-    FlatIndexNode(const Object&) : index_(nullptr) {
+    FlatIndexNode(const std::string& version, const Object& object) : index_(nullptr) {
         static_assert(std::is_same<T, faiss::IndexFlat>::value || std::is_same<T, faiss::IndexBinaryFlat>::value,
                       "not support");
         search_pool_ = ThreadPool::GetGlobalSearchThreadPool();
@@ -38,17 +38,18 @@ class FlatIndexNode : public IndexNode {
     Train(const DataSet& dataset, const Config& cfg) override {
         const FlatConfig& f_cfg = static_cast<const FlatConfig&>(cfg);
 
-        // do normalize for COSINE metric type
-        if (IsMetricType(f_cfg.metric_type.value(), knowhere::metric::COSINE)) {
-            Normalize(dataset);
-        }
-
         auto metric = Str2FaissMetricType(f_cfg.metric_type.value());
         if (!metric.has_value()) {
             LOG_KNOWHERE_WARNING_ << "please check metric type: " << f_cfg.metric_type.value();
             return metric.error();
         }
-        index_ = std::make_unique<T>(dataset.GetDim(), metric.value());
+        if constexpr (std::is_same<faiss::IndexBinaryFlat, T>::value) {
+            index_ = std::make_unique<faiss::IndexBinaryFlat>(dataset.GetDim(), metric.value());
+        }
+        if constexpr (std::is_same<faiss::IndexFlat, T>::value) {
+            bool is_cosine = IsMetricType(f_cfg.metric_type.value(), knowhere::metric::COSINE);
+            index_ = std::make_unique<faiss::IndexFlat>(dataset.GetDim(), metric.value(), is_cosine);
+        }
         return Status::success;
     }
 
@@ -273,7 +274,7 @@ class FlatIndexNode : public IndexNode {
     bool
     HasRawData(const std::string& metric_type) const override {
         if constexpr (std::is_same<T, faiss::IndexFlat>::value) {
-            return !IsMetricType(metric_type, metric::COSINE);
+            return true;
         }
         if constexpr (std::is_same<T, faiss::IndexBinaryFlat>::value) {
             return true;
@@ -386,13 +387,14 @@ class FlatIndexNode : public IndexNode {
     std::shared_ptr<ThreadPool> search_pool_;
 };
 
-KNOWHERE_REGISTER_GLOBAL(FLAT,
-                         [](const Object& object) { return Index<FlatIndexNode<faiss::IndexFlat>>::Create(object); });
-KNOWHERE_REGISTER_GLOBAL(BINFLAT, [](const Object& object) {
-    return Index<FlatIndexNode<faiss::IndexBinaryFlat>>::Create(object);
+KNOWHERE_REGISTER_GLOBAL(FLAT, [](const std::string& version, const Object& object) {
+    return Index<FlatIndexNode<faiss::IndexFlat>>::Create(version, object);
 });
-KNOWHERE_REGISTER_GLOBAL(BIN_FLAT, [](const Object& object) {
-    return Index<FlatIndexNode<faiss::IndexBinaryFlat>>::Create(object);
+KNOWHERE_REGISTER_GLOBAL(BINFLAT, [](const std::string& version, const Object& object) {
+    return Index<FlatIndexNode<faiss::IndexBinaryFlat>>::Create(version, object);
+});
+KNOWHERE_REGISTER_GLOBAL(BIN_FLAT, [](const std::string& version, const Object& object) {
+    return Index<FlatIndexNode<faiss::IndexBinaryFlat>>::Create(version, object);
 });
 
 }  // namespace knowhere

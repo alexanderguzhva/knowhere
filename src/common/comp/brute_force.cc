@@ -88,8 +88,8 @@ BruteForce::Search(const DataSetPtr base_dataset, const DataSetPtr query_dataset
                     if (is_cosine) {
                         auto copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         // // todo aguzhva: bitset was here
-                        // faiss::knn_cosine(copied_query.get(), (const float*)xb, dim, 1, nb, &buf, bitset);
-                        faiss::knn_cosine(copied_query.get(), (const float*)xb, dim, 1, nb, &buf, id_selector);
+                        // faiss::knn_cosine(copied_query.get(), (const float*)xb, nullptr, dim, 1, nb, &buf, bitset);
+                        faiss::knn_cosine(copied_query.get(), (const float*)xb, nullptr, dim, 1, nb, &buf, id_selector);
                     } else {
                         // // todo aguzhva: bitset was here
                         // faiss::knn_inner_product(cur_query, (const float*)xb, dim, 1, nb, &buf, bitset);
@@ -200,8 +200,8 @@ BruteForce::SearchWithBuf(const DataSetPtr base_dataset, const DataSetPtr query_
                     if (is_cosine) {
                         auto copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         // // todo aguzhva: bitset was here
-                        // faiss::knn_cosine(copied_query.get(), (const float*)xb, dim, 1, nb, &buf, bitset);
-                        faiss::knn_cosine(copied_query.get(), (const float*)xb, dim, 1, nb, &buf, id_selector);
+                        // faiss::knn_cosine(copied_query.get(), (const float*)xb, nullptr, dim, 1, nb, &buf, bitset);
+                        faiss::knn_cosine(copied_query.get(), (const float*)xb, nullptr, dim, 1, nb, &buf, id_selector);
                     } else {
                         // // todo aguzhva: bitset was here
                         // faiss::knn_inner_product(cur_query, (const float*)xb, dim, 1, nb, &buf, bitset);
@@ -319,9 +319,9 @@ BruteForce::RangeSearch(const DataSetPtr base_dataset, const DataSetPtr query_da
                     if (is_cosine) {
                         auto copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         // // todo aguzhva: bitset was here
-                        // faiss::range_search_cosine(copied_query.get(), (const float*)xb, dim, 1, nb, radius, &res,
+                        // faiss::range_search_cosine(copied_query.get(), (const float*)xb, nullptr, dim, 1, nb, radius, &res,
                         //                            bitset);
-                        faiss::range_search_cosine(copied_query.get(), (const float*)xb, dim, 1, nb, radius, &res,
+                        faiss::range_search_cosine(copied_query.get(), (const float*)xb, nullptr, dim, 1, nb, radius, &res,
                                                    id_selector);
                     } else {
                         // // todo aguzhva: bitset was here

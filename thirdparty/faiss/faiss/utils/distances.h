@@ -247,6 +247,7 @@ void knn_L2sqr(
 void knn_cosine(
         const float* x,
         const float* y,
+        const float* y_norms,
         size_t d,
         size_t nx,
         size_t ny,
@@ -365,6 +366,7 @@ void range_search_inner_product(
 void range_search_cosine(
         const float* x,
         const float* y,
+        const float* y_norms,
         size_t d,
         size_t nx,
         size_t ny,
