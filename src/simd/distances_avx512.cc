@@ -18,6 +18,8 @@
 #include <cstdio>
 #include <string>
 
+#include "faiss/impl/platform_macros.h"
+
 namespace faiss {
 
 // reads 0 <= d < 4 floats as __m128
@@ -39,6 +41,7 @@ masked_read(int d, const float* x) {
 
 extern uint8_t lookup8bit[256];
 
+/*
 float
 fvec_inner_product_avx512(const float* x, const float* y, size_t d) {
     __m512 msum0 = _mm512_setzero_ps();
@@ -138,6 +141,35 @@ fvec_L2sqr_avx512(const float* x, const float* y, size_t d) {
     msum2 = _mm_hadd_ps(msum2, msum2);
     return _mm_cvtss_f32(msum2);
 }
+*/
+
+FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
+float
+fvec_inner_product_ref(const float* x, const float* y, size_t d) {
+    size_t i;
+    float res = 0;
+    FAISS_PRAGMA_IMPRECISE_LOOP
+    for (i = 0; i < d; i++) {
+        res += x[i] * y[i];
+    }
+    return res;
+}
+FAISS_PRAGMA_IMPRECISE_FUNCTION_END
+
+FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
+float
+fvec_L2sqr_ref(const float* x, const float* y, size_t d) {
+    size_t i;
+    float res = 0;
+    FAISS_PRAGMA_IMPRECISE_LOOP
+    for (i = 0; i < d; i++) {
+        const float tmp = x[i] - y[i];
+        res += tmp * tmp;
+    }
+    return res;
+}
+FAISS_PRAGMA_IMPRECISE_FUNCTION_END
+
 
 float
 fvec_L1_avx512(const float* x, const float* y, size_t d) {

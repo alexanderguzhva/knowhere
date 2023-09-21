@@ -60,6 +60,7 @@ float
 fvec_inner_product_ref(const float* x, const float* y, size_t d) {
     size_t i;
     float res = 0;
+    FAISS_PRAGMA_IMPRECISE_LOOP
     for (i = 0; i < d; i++) {
         res += x[i] * y[i];
     }
