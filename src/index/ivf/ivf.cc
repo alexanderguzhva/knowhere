@@ -302,12 +302,8 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             auto nlist = MatchNlist(rows, scann_cfg.nlist.value());
             bool is_cosine = base_cfg.metric_type.value() == metric::COSINE;
             qzr = new (std::nothrow) typename QuantizerT<T>::type(dim, metric.value());
-            // // todo aguzhva: replaced is_cosine
-            // base_index =
-            //     new (std::nothrow) faiss::IndexIVFPQFastScan(qzr, dim, nlist, dim / 2, 4, is_cosine, metric.value());
             base_index =
-                new (std::nothrow) faiss::IndexIVFPQFastScan(qzr, dim, nlist, dim / 2, 4, metric.value());
-            base_index->is_cosine_ = is_cosine;
+                new (std::nothrow) faiss::IndexIVFPQFastScan(qzr, dim, nlist, (dim + 1) / 2, 4, is_cosine, metric.value());
             base_index->own_fields = true;
             if (scann_cfg.with_raw_data.value()) {
                 index = std::make_unique<faiss::IndexScaNN>(base_index, (const float*)data);
@@ -780,7 +776,8 @@ IvfIndexNode<T>::Deserialize(const BinarySet& binset, const Config& config) {
         if constexpr (std::is_same<T, faiss::IndexIVFFlat>::value) {
             auto raw_binary = binset.GetByName("RAW_DATA");
             if (raw_binary != nullptr) {
-                ConvertIVFFlatIfNeeded(binset, raw_binary->data.get(), raw_binary->size);
+                const BaseConfig& base_cfg = static_cast<const BaseConfig&>(config);
+                ConvertIVFFlatIfNeeded(binset, base_cfg.metric_type.value(), raw_binary->data.get(), raw_binary->size);
                 // after conversion, binary size and data will be updated
                 reader.data_ = binary->data.get();
                 reader.total_ = binary->size;
