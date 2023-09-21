@@ -166,7 +166,7 @@ struct IVFSQScannerL2 : InvertedListScanner {
             float dis = dc.query_to_code(codes);
 
             if (dis < simi[0]) {
-                int64_t id = store_pairs ? (list_no << 32 | j) : ids[j];
+                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
                 maxheap_replace_top(k, simi, idxi, dis, id);
                 nup++;
             }
@@ -188,7 +188,7 @@ struct IVFSQScannerL2 : InvertedListScanner {
 
             float dis = dc.query_to_code(codes);
             if (dis < radius) {
-                int64_t id = store_pairs ? (list_no << 32 | j) : ids[j];
+                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
                 res.add(dis, id);
             }
         }
