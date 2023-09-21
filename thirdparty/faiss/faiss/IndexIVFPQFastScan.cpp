@@ -51,6 +51,19 @@ IndexIVFPQFastScan::IndexIVFPQFastScan(
     init_fastscan(M, nbits, nlist, metric, bbs);
 }
 
+IndexIVFPQFastScan::IndexIVFPQFastScan(
+        Index* quantizer,
+        size_t d,
+        size_t nlist,
+        size_t M,
+        size_t nbits_per_idx,
+        bool is_cosine,
+        MetricType metric,
+        int bbs)
+        : IndexIVFPQFastScan(quantizer, d, nlist, M, nbits_per_idx, metric, bbs) {
+    is_cosine_ = is_cosine;
+}
+
 IndexIVFPQFastScan::IndexIVFPQFastScan() {
     by_residual = false;
     bbs = 0;

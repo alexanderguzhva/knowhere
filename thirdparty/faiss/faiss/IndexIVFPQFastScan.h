@@ -54,6 +54,16 @@ struct IndexIVFPQFastScan : IndexIVFFastScan {
             MetricType metric = METRIC_L2,
             int bbs = 32);
 
+    IndexIVFPQFastScan(
+            Index* quantizer,
+            size_t d,
+            size_t nlist,
+            size_t M,
+            size_t nbits,
+            bool is_cosine,
+            MetricType metric = METRIC_L2,
+            int bbs = 32);
+
     IndexIVFPQFastScan();
 
     // built from an IndexIVFPQ

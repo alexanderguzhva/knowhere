@@ -145,7 +145,7 @@ fvec_L2sqr_avx512(const float* x, const float* y, size_t d) {
 
 FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 float
-fvec_inner_product_ref(const float* x, const float* y, size_t d) {
+fvec_inner_product_avx512(const float* x, const float* y, size_t d) {
     size_t i;
     float res = 0;
     FAISS_PRAGMA_IMPRECISE_LOOP
@@ -158,7 +158,7 @@ FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
 FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 float
-fvec_L2sqr_ref(const float* x, const float* y, size_t d) {
+fvec_L2sqr_avx512(const float* x, const float* y, size_t d) {
     size_t i;
     float res = 0;
     FAISS_PRAGMA_IMPRECISE_LOOP
