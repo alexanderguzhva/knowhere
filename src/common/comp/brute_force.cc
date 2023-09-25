@@ -19,12 +19,12 @@
 #include "faiss/utils/binary_distances.h"
 #include "faiss/utils/distances.h"
 #include "knowhere/comp/thread_pool.h"
+#include "knowhere/bitsetview_idselector.h"
 #include "knowhere/config.h"
 #include "knowhere/expected.h"
 #include "knowhere/log.h"
 #include "knowhere/utils.h"
 
-#include "index/bitsetview_idselector.h"
 
 namespace knowhere {
 

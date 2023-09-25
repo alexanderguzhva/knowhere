@@ -23,6 +23,7 @@
 #include "index/ivf/ivf_config.h"
 #include "io/memory_io.h"
 #include "knowhere/comp/thread_pool.h"
+#include "knowhere/bitsetview_idselector.h"
 #include "knowhere/dataset.h"
 #include "knowhere/expected.h"
 #include "knowhere/factory.h"
@@ -30,7 +31,6 @@
 #include "knowhere/log.h"
 #include "knowhere/utils.h"
 
-#include "index/bitsetview_idselector.h"
 
 namespace knowhere {
 

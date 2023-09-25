@@ -156,7 +156,8 @@ class Benchmark_float_bitset : public Benchmark_knowhere, public ::testing::Test
  protected:
     const std::vector<int32_t> NQs_ = {10000};
     const std::vector<int32_t> TOPKs_ = {100};
-    const std::vector<int32_t> PERCENTs_ = {0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
+    // const std::vector<int32_t> PERCENTs_ = {0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
+    const std::vector<int32_t> PERCENTs_ = {90, 95, 100};
 
     // IVF index params
     // const std::vector<int32_t> NLISTs_ = {1024};
@@ -185,6 +186,7 @@ TEST_F(Benchmark_float_bitset, TEST_IVF_FLAT) {
     test_ivf(conf);
 }
 
+/*
 TEST_F(Benchmark_float_bitset, TEST_IVF_SQ8) {
     index_type_ = knowhere::IndexEnum::INDEX_FAISS_IVFSQ8;
 
@@ -242,3 +244,4 @@ TEST_F(Benchmark_float_bitset, TEST_DISKANN) {
     index_.Build(*ds_ptr, conf);
     test_diskann(conf);
 }
+*/

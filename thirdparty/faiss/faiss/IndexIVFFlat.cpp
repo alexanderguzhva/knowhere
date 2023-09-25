@@ -16,6 +16,7 @@
 #include <cstdio>
 
 #include "knowhere/utils.h"
+#include "knowhere/bitsetview_idselector.h"
 
 #include <faiss/IndexFlat.h>
 
@@ -256,11 +257,129 @@ struct IVFFlatScanner : InvertedListScanner {
     }
 };
 
+// a custom version for Knowhere
+template <MetricType metric, class C, bool use_sel>
+struct IVFFlatBitsetViewScanner : InvertedListScanner {
+    size_t d;
+    knowhere::BitsetView bitset;
+
+    IVFFlatBitsetViewScanner(size_t d, bool store_pairs, const IDSelector* sel)
+            : InvertedListScanner(store_pairs, sel), d(d) {
+        const auto* bitsetview_sel = dynamic_cast<const knowhere::BitsetViewIDSelector*>(sel);
+        FAISS_ASSERT_MSG((bitsetview_sel != nullptr), "Unsupported scanner for IVFFlatBitsetViewScanner");
+
+        bitset = bitsetview_sel->bitset_view;
+    }
+
+    const float* xi;
+    void set_query(const float* query) override {
+        this->xi = query;
+    }
+
+    void set_list(idx_t list_no, float /* coarse_dis */) override {
+        this->list_no = list_no;
+    }
+
+    float distance_to_code(const uint8_t* code) const override {
+        const float* yj = (float*)code;
+        float dis = metric == METRIC_INNER_PRODUCT
+                ? fvec_inner_product(xi, yj, d)
+                : fvec_L2sqr(xi, yj, d);
+        return dis;
+    }
+
+    size_t scan_codes(
+            size_t list_size,
+            const uint8_t* codes,
+            const float* code_norms,
+            const idx_t* ids,
+            float* simi,
+            idx_t* idxi,
+            size_t k) const override {
+        const float* list_vecs = (const float*)codes;
+        size_t nup = 0;
+        for (size_t j = 0; j < list_size; j++) {
+            const float* yj = list_vecs + d * j;
+
+            // todo aguzhva: bitset around these lines,
+            //   check the baseline
+
+            // bitset.empty() translates into use_sel=false
+            if (use_sel && bitset.test(ids[j])) {
+                continue;
+            }
+            float dis = metric == METRIC_INNER_PRODUCT
+                    ? fvec_inner_product(xi, yj, d)
+                    : fvec_L2sqr(xi, yj, d);
+            if (code_norms) {
+                dis /= code_norms[j];
+            }
+            if (C::cmp(simi[0], dis)) {
+                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
+                heap_replace_top<C>(k, simi, idxi, dis, id);
+                nup++;
+            }
+        }
+        return nup;
+    }
+
+    void scan_codes_range(
+            size_t list_size,
+            const uint8_t* codes,
+            const float* code_norms,
+            const idx_t* ids,
+            float radius,
+            RangeQueryResult& res) const override {
+        const float* list_vecs = (const float*)codes;
+        for (size_t j = 0; j < list_size; j++) {
+            const float* yj = list_vecs + d * j;
+
+            // todo aguzhva: bitset around these lines,
+            //   check the baseline
+
+            // bitset.empty() translates into use_sel=false
+            if (use_sel && bitset.test(ids[j])) {
+                continue;
+            }
+            float dis = metric == METRIC_INNER_PRODUCT
+                    ? fvec_inner_product(xi, yj, d)
+                    : fvec_L2sqr(xi, yj, d);
+            if (code_norms) {
+                dis /= code_norms[j];
+            }
+            if (C::cmp(radius, dis)) {
+                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
+                res.add(dis, id);
+            }
+        }
+    }
+};
+
+
 template <bool use_sel>
 InvertedListScanner* get_InvertedListScanner1(
         const IndexIVFFlat* ivf,
         bool store_pairs,
         const IDSelector* sel) {
+    // Specialized version for Knowhere. It is needed to get
+    //   rid of virtual function calls, because sel can filter
+    //   out 99% of samples, so the cost of virtual function calls
+    //   becomes noticeable compared to distance computations.
+    if (const auto* bitsetview_sel = dynamic_cast<const knowhere::BitsetViewIDSelector*>(sel)) {
+        if (ivf->metric_type == METRIC_INNER_PRODUCT) {
+            return new IVFFlatBitsetViewScanner<
+                    METRIC_INNER_PRODUCT,
+                    CMin<float, int64_t>,
+                    use_sel>(ivf->d, store_pairs, sel);
+        } else if (ivf->metric_type == METRIC_L2) {
+            return new IVFFlatBitsetViewScanner<METRIC_L2, CMax<float, int64_t>, use_sel>(
+                    ivf->d, store_pairs, sel);
+        } else {
+            FAISS_THROW_MSG("metric type not supported");
+        }
+    }
+
+    // default faiss version
     if (ivf->metric_type == METRIC_INNER_PRODUCT) {
         return new IVFFlatScanner<
                 METRIC_INNER_PRODUCT,
