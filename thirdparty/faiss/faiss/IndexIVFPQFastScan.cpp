@@ -213,12 +213,12 @@ void IndexIVFPQFastScan::encode_vectors(
  * Look-Up Table functions
  *********************************************************/
 
-void fvec_madd_avx(
+void fvec_madd_avx_internal(
         size_t n,
-        const float* a,
+        const float* __restrict a,
         float bf,
-        const float* b,
-        float* c) {
+        const float* __restrict b,
+        float* __restrict c) {
     assert(is_aligned_pointer(a));
     assert(is_aligned_pointer(b));
     assert(is_aligned_pointer(c));
@@ -269,7 +269,7 @@ void IndexIVFPQFastScan::compute_LUT(
                     idx_t cij = coarse_ids[ij];
 
                     if (cij >= 0) {
-                        fvec_madd_avx(
+                        fvec_madd_avx_internal(
                                 dim12,
                                 precomputed_table.get() + cij * dim12,
                                 -2,

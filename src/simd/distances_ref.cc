@@ -11,39 +11,30 @@
 
 #include <cmath>
 
-#include "faiss/impl/platform_macros.h"
-
 namespace faiss {
 
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 float
 fvec_L2sqr_ref(const float* x, const float* y, size_t d) {
     size_t i;
     float res = 0;
-    FAISS_PRAGMA_IMPRECISE_LOOP
     for (i = 0; i < d; i++) {
         const float tmp = x[i] - y[i];
         res += tmp * tmp;
     }
     return res;
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 float
 fvec_L1_ref(const float* x, const float* y, size_t d) {
     size_t i;
     float res = 0;
-    FAISS_PRAGMA_IMPRECISE_LOOP
     for (i = 0; i < d; i++) {
         const float tmp = x[i] - y[i];
         res += std::fabs(tmp);
     }
     return res;
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 float
 fvec_Linf_ref(const float* x, const float* y, size_t d) {
     size_t i;
@@ -53,35 +44,27 @@ fvec_Linf_ref(const float* x, const float* y, size_t d) {
     }
     return res;
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 float
 fvec_inner_product_ref(const float* x, const float* y, size_t d) {
     size_t i;
     float res = 0;
-    FAISS_PRAGMA_IMPRECISE_LOOP
     for (i = 0; i < d; i++) {
         res += x[i] * y[i];
     }
     return res;
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 float
 fvec_norm_L2sqr_ref(const float* x, size_t d) {
     size_t i;
     double res = 0;
-    FAISS_PRAGMA_IMPRECISE_LOOP
     for (i = 0; i < d; i++) {
         res += x[i] * x[i];
     }
     return res;
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 void
 fvec_L2sqr_ny_ref(float* dis, const float* x, const float* y, size_t d, size_t ny) {
     for (size_t i = 0; i < ny; i++) {
@@ -89,9 +72,7 @@ fvec_L2sqr_ny_ref(float* dis, const float* x, const float* y, size_t d, size_t n
         y += d;
     }
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 void
 fvec_inner_products_ny_ref(float* ip, const float* x, const float* y, size_t d, size_t ny) {
     for (size_t i = 0; i < ny; i++) {
@@ -99,11 +80,9 @@ fvec_inner_products_ny_ref(float* ip, const float* x, const float* y, size_t d, 
         y += d;
     }
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
 /// compute ny square L2 distance between x and a set of transposed contiguous
 /// y vectors. squared lengths of y should be provided as well
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 void fvec_L2sqr_ny_transposed_ref(
         float* __restrict dis,
         const float* __restrict x,
@@ -113,14 +92,12 @@ void fvec_L2sqr_ny_transposed_ref(
         size_t d_offset,
         size_t ny) {
     float x_sqlen = 0;
-    FAISS_PRAGMA_IMPRECISE_LOOP
     for (size_t j = 0; j < d; j++) {
         x_sqlen += x[j] * x[j];
     }
 
     for (size_t i = 0; i < ny; i++) {
         float dp = 0;
-        FAISS_PRAGMA_IMPRECISE_LOOP
         for (size_t j = 0; j < d; j++) {
             dp += x[j] * y[i + j * d_offset];
         }
@@ -128,12 +105,10 @@ void fvec_L2sqr_ny_transposed_ref(
         dis[i] = x_sqlen + y_sqlen[i] - 2 * dp;
     }
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
 /// compute ny square L2 distance between x and a set of contiguous y vectors
 /// and return the index of the nearest vector.
 /// return 0 if ny == 0.
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 size_t fvec_L2sqr_ny_nearest_ref(
         float* __restrict distances_tmp_buffer,
         const float* __restrict x,
@@ -154,13 +129,11 @@ size_t fvec_L2sqr_ny_nearest_ref(
 
     return nearest_idx;
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
 /// compute ny square L2 distance between x and a set of transposed contiguous
 /// y vectors and return the index of the nearest vector.
 /// squared lengths of y should be provided as well
 /// return 0 if ny == 0.
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 size_t fvec_L2sqr_ny_nearest_y_transposed_ref(
         float* __restrict distances_tmp_buffer,
         const float* __restrict x,
@@ -184,19 +157,14 @@ size_t fvec_L2sqr_ny_nearest_y_transposed_ref(
 
     return nearest_idx;        
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 void
 fvec_madd_ref(size_t n, const float* a, float bf, const float* b, float* c) {
-    FAISS_PRAGMA_IMPRECISE_LOOP
     for (size_t i = 0; i < n; i++) {
         c[i] = a[i] + bf * b[i];
     }
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 int
 fvec_madd_and_argmin_ref(size_t n, const float* a, float bf, const float* b, float* c) {
     float vmin = 1e20;
@@ -211,9 +179,7 @@ fvec_madd_and_argmin_ref(size_t n, const float* a, float bf, const float* b, flo
     }
     return imin;
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 void
 fvec_inner_product_batch_4_ref(
         const float* __restrict x,
@@ -230,7 +196,6 @@ fvec_inner_product_batch_4_ref(
     float d1 = 0;
     float d2 = 0;
     float d3 = 0;
-    FAISS_PRAGMA_IMPRECISE_LOOP
     for (size_t i = 0; i < d; ++i) {
         d0 += x[i] * y0[i];
         d1 += x[i] * y1[i];
@@ -243,9 +208,7 @@ fvec_inner_product_batch_4_ref(
     dis2 = d2;
     dis3 = d3;
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
-FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 void 
 fvec_L2sqr_batch_4_ref(
         const float* x,
@@ -262,7 +225,6 @@ fvec_L2sqr_batch_4_ref(
     float d1 = 0;
     float d2 = 0;
     float d3 = 0;
-    FAISS_PRAGMA_IMPRECISE_LOOP
     for (size_t i = 0; i < d; ++i) {
         const float q0 = x[i] - y0[i];
         const float q1 = x[i] - y1[i];
@@ -279,7 +241,5 @@ fvec_L2sqr_batch_4_ref(
     dis2 = d2;
     dis3 = d3;
 }
-FAISS_PRAGMA_IMPRECISE_FUNCTION_END
-
 
 }  // namespace faiss
