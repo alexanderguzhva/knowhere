@@ -23,9 +23,9 @@ if(__X86_64)
   add_library(utils_avx512 OBJECT ${UTILS_AVX512_SRC})
 
   target_compile_options(utils_sse PRIVATE -msse4.2)
-  target_compile_options(utils_avx PRIVATE -mf16c -mavx2)
+  target_compile_options(utils_avx PRIVATE -mf16c -mavx2 -mfma)
   target_compile_options(utils_avx512 PRIVATE -mf16c -mavx512f -mavx512dq
-                                              -mavx512bw)
+                                              -mavx512bw -mfma)
 
   add_library(
     knowhere_utils STATIC
