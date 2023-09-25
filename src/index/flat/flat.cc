@@ -28,7 +28,7 @@ namespace knowhere {
 template <typename T>
 class FlatIndexNode : public IndexNode {
  public:
-    FlatIndexNode(const std::string& version, const Object& object) : index_(nullptr) {
+    FlatIndexNode(const int32_t& version, const Object& object) : index_(nullptr) {
         static_assert(std::is_same<T, faiss::IndexFlat>::value || std::is_same<T, faiss::IndexBinaryFlat>::value,
                       "not support");
         search_pool_ = ThreadPool::GetGlobalSearchThreadPool();
@@ -70,7 +70,7 @@ class FlatIndexNode : public IndexNode {
     Search(const DataSet& dataset, const Config& cfg, const BitsetView& bitset) const override {
         if (!index_) {
             LOG_KNOWHERE_WARNING_ << "search on empty index";
-            expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
+            return expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
         }
 
         DataSetPtr results = std::make_shared<DataSet>();
@@ -151,7 +151,7 @@ class FlatIndexNode : public IndexNode {
     RangeSearch(const DataSet& dataset, const Config& cfg, const BitsetView& bitset) const override {
         if (!index_) {
             LOG_KNOWHERE_WARNING_ << "range search on empty index";
-            expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
+            return expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
         }
 
         const FlatConfig& f_cfg = static_cast<const FlatConfig&>(cfg);
@@ -290,7 +290,7 @@ class FlatIndexNode : public IndexNode {
     Serialize(BinarySet& binset) const override {
         if (!index_) {
             LOG_KNOWHERE_ERROR_ << "Can not serialize empty index.";
-            expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
+            return Status::empty_index;
         }
         try {
             MemoryIOWriter writer;
@@ -387,13 +387,13 @@ class FlatIndexNode : public IndexNode {
     std::shared_ptr<ThreadPool> search_pool_;
 };
 
-KNOWHERE_REGISTER_GLOBAL(FLAT, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(FLAT, [](const int32_t& version, const Object& object) {
     return Index<FlatIndexNode<faiss::IndexFlat>>::Create(version, object);
 });
-KNOWHERE_REGISTER_GLOBAL(BINFLAT, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(BINFLAT, [](const int32_t& version, const Object& object) {
     return Index<FlatIndexNode<faiss::IndexBinaryFlat>>::Create(version, object);
 });
-KNOWHERE_REGISTER_GLOBAL(BIN_FLAT, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(BIN_FLAT, [](const int32_t& version, const Object& object) {
     return Index<FlatIndexNode<faiss::IndexBinaryFlat>>::Create(version, object);
 });
 

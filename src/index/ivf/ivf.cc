@@ -47,7 +47,7 @@ struct QuantizerT<faiss::IndexBinaryIVF> {
 template <typename T>
 class IvfIndexNode : public IndexNode {
  public:
-    IvfIndexNode(const std::string& /*version*/, const Object& object) : index_(nullptr) {
+    IvfIndexNode(const int32_t& /*version*/, const Object& object) : index_(nullptr) {
         static_assert(std::is_same<T, faiss::IndexIVFFlat>::value || std::is_same<T, faiss::IndexIVFFlatCC>::value ||
                           std::is_same<T, faiss::IndexIVFPQ>::value ||
                           std::is_same<T, faiss::IndexIVFScalarQuantizer>::value ||
@@ -348,7 +348,7 @@ Status
 IvfIndexNode<T>::Add(const DataSet& dataset, const Config& cfg) {
     if (!this->index_) {
         LOG_KNOWHERE_ERROR_ << "Can not add data to empty IVF index.";
-        expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
+        return Status::empty_index;
     }
     auto data = dataset.GetTensor();
     auto rows = dataset.GetRows();
@@ -375,11 +375,11 @@ expected<DataSetPtr>
 IvfIndexNode<T>::Search(const DataSet& dataset, const Config& cfg, const BitsetView& bitset) const {
     if (!this->index_) {
         LOG_KNOWHERE_WARNING_ << "search on empty index";
-        expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
+        return expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
     }
     if (!this->index_->is_trained) {
         LOG_KNOWHERE_WARNING_ << "index not trained";
-        expected<DataSetPtr>::Err(Status::index_not_trained, "index not trained");
+        return expected<DataSetPtr>::Err(Status::index_not_trained, "index not trained");
     }
 
     auto dim = dataset.GetDim();
@@ -499,11 +499,11 @@ expected<DataSetPtr>
 IvfIndexNode<T>::RangeSearch(const DataSet& dataset, const Config& cfg, const BitsetView& bitset) const {
     if (!this->index_) {
         LOG_KNOWHERE_WARNING_ << "range search on empty index";
-        expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
+        return expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
     }
     if (!this->index_->is_trained) {
         LOG_KNOWHERE_WARNING_ << "index not trained";
-        expected<DataSetPtr>::Err(Status::index_not_trained, "index not trained");
+        return expected<DataSetPtr>::Err(Status::index_not_trained, "index not trained");
     }
 
     auto nq = dataset.GetRows();
@@ -628,7 +628,7 @@ template <typename T>
 expected<DataSetPtr>
 IvfIndexNode<T>::GetVectorByIds(const DataSet& dataset) const {
     if (!this->index_) {
-        expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
+        return expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
     }
     if (!this->index_->is_trained) {
         return expected<DataSetPtr>::Err(Status::index_not_trained, "index not trained");
@@ -706,7 +706,7 @@ expected<DataSetPtr>
 IvfIndexNode<faiss::IndexIVFFlat>::GetIndexMeta(const Config& config) const {
     if (!index_) {
         LOG_KNOWHERE_WARNING_ << "get index meta on empty index";
-        expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
+        return expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
     }
 
     auto ivf_index = dynamic_cast<faiss::IndexIVF*>(index_.get());
@@ -817,40 +817,40 @@ IvfIndexNode<T>::DeserializeFromFile(const std::string& filename, const Config& 
     return Status::success;
 }
 
-KNOWHERE_REGISTER_GLOBAL(IVFBIN, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(IVFBIN, [](const int32_t& version, const Object& object) {
     return Index<IvfIndexNode<faiss::IndexBinaryIVF>>::Create(version, object);
 });
 
-KNOWHERE_REGISTER_GLOBAL(BIN_IVF_FLAT, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(BIN_IVF_FLAT, [](const int32_t& version, const Object& object) {
     return Index<IvfIndexNode<faiss::IndexBinaryIVF>>::Create(version, object);
 });
 
-KNOWHERE_REGISTER_GLOBAL(IVFFLAT, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(IVFFLAT, [](const int32_t& version, const Object& object) {
     return Index<IvfIndexNode<faiss::IndexIVFFlat>>::Create(version, object);
 });
-KNOWHERE_REGISTER_GLOBAL(IVF_FLAT, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(IVF_FLAT, [](const int32_t& version, const Object& object) {
     return Index<IvfIndexNode<faiss::IndexIVFFlat>>::Create(version, object);
 });
-KNOWHERE_REGISTER_GLOBAL(IVFFLATCC, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(IVFFLATCC, [](const int32_t& version, const Object& object) {
     return Index<IvfIndexNode<faiss::IndexIVFFlatCC>>::Create(version, object);
 });
-KNOWHERE_REGISTER_GLOBAL(IVF_FLAT_CC, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(IVF_FLAT_CC, [](const int32_t& version, const Object& object) {
     return Index<IvfIndexNode<faiss::IndexIVFFlatCC>>::Create(version, object);
 });
-KNOWHERE_REGISTER_GLOBAL(SCANN, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(SCANN, [](const int32_t& version, const Object& object) {
     return Index<IvfIndexNode<faiss::IndexScaNN>>::Create(version, object);
 });
-KNOWHERE_REGISTER_GLOBAL(IVFPQ, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(IVFPQ, [](const int32_t& version, const Object& object) {
     return Index<IvfIndexNode<faiss::IndexIVFPQ>>::Create(version, object);
 });
-KNOWHERE_REGISTER_GLOBAL(IVF_PQ, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(IVF_PQ, [](const int32_t& version, const Object& object) {
     return Index<IvfIndexNode<faiss::IndexIVFPQ>>::Create(version, object);
 });
 
-KNOWHERE_REGISTER_GLOBAL(IVFSQ, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(IVFSQ, [](const int32_t& version, const Object& object) {
     return Index<IvfIndexNode<faiss::IndexIVFScalarQuantizer>>::Create(version, object);
 });
-KNOWHERE_REGISTER_GLOBAL(IVF_SQ8, [](const std::string& version, const Object& object) {
+KNOWHERE_REGISTER_GLOBAL(IVF_SQ8, [](const int32_t& version, const Object& object) {
     return Index<IvfIndexNode<faiss::IndexIVFScalarQuantizer>>::Create(version, object);
 });
 
