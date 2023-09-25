@@ -31,18 +31,12 @@ using SQuantizer = ScalarQuantizer::SQuantizer;
 
 struct Codec8bit_avx512 : public Codec8bit_avx {
     static __m512 decode_16_components(const uint8_t *code, int i) {
-        uint64_t c8 = *(uint64_t*)(code + i);
-        __m256i c8lo = _mm256_cvtepu8_epi32(_mm_set1_epi64x(c8));
-        c8 = *(uint64_t*)(code + i + 8);
-        __m256i c8hi = _mm256_cvtepu8_epi32(_mm_set1_epi64x(c8));
-        // __m256i i8 = _mm256_set_m128i(c4lo, c4hi);
-        __m512i i16 = _mm512_castsi256_si512(c8lo);
-        i16 = _mm512_inserti32x8(i16, c8hi, 1);
-        __m512 f16 = _mm512_cvtepi32_ps(i16);
-        __m512 half = _mm512_set1_ps(0.5f);
-        f16 = _mm512_add_ps(f16, half);
-        __m512 one_255 = _mm512_set1_ps(1.f / 255.f);
-        return _mm512_mul_ps(f16, one_255);
+        const __m128i c8 = _mm_loadu_si128((const __m128i_u*)(code + i));
+        const __m512i i32 = _mm512_cvtepu8_epi32(c8);
+        const __m512 f8 = _mm512_cvtepi32_ps(i32);
+        const __m512 half_one_255 = _mm512_set1_ps(0.5f / 255.f);
+        const __m512 one_255 = _mm512_set1_ps(1.f / 255.f);
+        return _mm512_fmadd_ps(f8, one_255, half_one_255);
     }
 };
 
