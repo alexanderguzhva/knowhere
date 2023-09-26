@@ -621,10 +621,10 @@ static void read_direct_map(DirectMap* dm, IOReader* f) {
     }
 }
 
-void read_ivf_header(
+static void read_ivf_header(
         IndexIVF* ivf,
         IOReader* f,
-        std::vector<std::vector<idx_t>>* ids) {
+        std::vector<std::vector<idx_t>>* ids = nullptr) {
     read_index_header(ivf, f);
     READ1(ivf->nlist);
     READ1(ivf->nprobe);
@@ -1098,25 +1098,14 @@ Index* read_index(IOReader* f, int io_flags) {
         if (idxrf->with_raw_data) {
             idxrf->refine_index = read_index(f, io_flags);
             if (dynamic_cast<IndexFlat*>(idxrf->refine_index)) {
-                // then make a RefineFlat with it
-
-                // todo aguzhva: due to a bug in baseline knowhere implementation,
-                //   we have to explicitly construct IndexScaNN object, because
-                //   index_write() call does not recognize IndexScaNN as a special
-                //   case
                 if (dynamic_cast<IndexIVFPQFastScan*>(idxrf->base_index)) {
                     // this is IndexScaNN
-
-                    // todo aguzhva: warning, this is C++ object slicing
                     IndexRefine* idxrf_old = idxrf;
                     idxrf = new IndexScaNN();
                     *idxrf = *idxrf_old;
                     delete idxrf_old;
-                }
-                else {
-                    // the default faiss case
-
-                    // todo aguzhva: warning, this is C++ object slicing
+                } else {
+                    // then make a RefineFlat with it
                     IndexRefine* idxrf_old = idxrf;
                     idxrf = new IndexRefineFlat();
                     *idxrf = *idxrf_old;
