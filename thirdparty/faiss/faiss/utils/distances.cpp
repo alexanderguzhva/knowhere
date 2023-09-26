@@ -129,6 +129,9 @@ struct BitsetViewSelectorHelper {
 };
 
 /* Find the nearest neighbors for nx queries in a set of ny vectors */
+
+/*
+/// Baseline implementation of exhaustive_inner_product_seq
 template <class ResultHandler>
 void exhaustive_inner_product_seq(
         const float* x,
@@ -162,9 +165,130 @@ void exhaustive_inner_product_seq(
         }
     }
 }
+*/
+
+// An improved implementation that
+// 1. helps the branch predictor,
+// 2. computes distances for 4 elements per loop
+template <class ResultHandler, class SelectorHelper>
+void exhaustive_inner_product_seq(
+        const float* __restrict x,
+        const float* __restrict y,
+        size_t d,
+        size_t nx,
+        size_t ny,
+        ResultHandler& res,
+        const SelectorHelper selector) {
+    using SingleResultHandler = typename ResultHandler::SingleResultHandler;
+    int nt = std::min(int(nx), omp_get_max_threads());
+
+#pragma omp parallel num_threads(nt)
+    {
+        SingleResultHandler resi(res);
+#pragma omp for
+        for (int64_t i = 0; i < nx; i++) {
+            const float* x_i = x + i * d;
+            resi.begin(i);
+
+            constexpr size_t BUFFER_SIZE = 8;
+            const size_t ny_n = (ny / BUFFER_SIZE) * BUFFER_SIZE;
+            size_t saved_j[2 * BUFFER_SIZE];
+            size_t counter = 0;
+
+            for (size_t j = 0; j < ny_n; j += BUFFER_SIZE) {
+                # pragma unroll
+                for (size_t jj = 0; jj < BUFFER_SIZE; jj++) {
+                    const bool is_acceptable = selector.is_member(j + jj);
+                    saved_j[counter] = j + jj; counter += is_acceptable ? 1 : 0;
+                }
+
+                if (counter >= 4) {
+                    const size_t counter_4 = (counter / 4) * 4;
+                    for (size_t iCounter = 0; iCounter < counter_4; iCounter += 4) {
+                        const float* __restrict y_j0 = y + d * saved_j[iCounter + 0];
+                        const float* __restrict y_j1 = y + d * saved_j[iCounter + 1];
+                        const float* __restrict y_j2 = y + d * saved_j[iCounter + 2];
+                        const float* __restrict y_j3 = y + d * saved_j[iCounter + 3];
+
+                        float dis[4] = {0, 0, 0, 0};
+                        fvec_inner_product_batch_4(
+                            x_i, y_j0, y_j1, y_j2, y_j3, d, dis[0], dis[1], dis[2], dis[3]
+                        );
+
+                        for (size_t jj = 0; jj < 4; jj++) {
+                            resi.add_result(dis[jj], saved_j[iCounter + jj]);
+                        }
+                    }
+
+                    // copy leftovers to the beginning of the buffer
+                    for (size_t jk = counter_4; jk < counter; jk++) {
+                        saved_j[jk - counter_4] = saved_j[jk];
+                    }
+
+                    // rewind
+                    counter -= counter_4;
+                }
+            }
+
+            for (size_t j = ny_n; j < ny; j++) {
+                const bool is_acceptable = selector.is_member(j);
+                saved_j[counter] = j; counter += is_acceptable ? 1 : 0;
+            }
+
+            // process leftovers
+            for (size_t jj = 0; jj < counter; jj++) {
+                const size_t j = saved_j[jj];
+                const float* __restrict y_j = y + d * j;
+
+                float ip = fvec_inner_product(x_i, y_j, d);
+                resi.add_result(ip, j);
+            }
+
+            resi.end();
+        }
+    }
+}
+
+template <class ResultHandler>
+void exhaustive_inner_product_seq(
+        const float* __restrict x,
+        const float* __restrict y,
+        size_t d,
+        size_t nx,
+        size_t ny,
+        ResultHandler& res,
+        const IDSelector* __restrict sel) {
+    // add different specialized cases here via introducing
+    //   helpers which are converted into templates.
+
+    // bitset.empty() translates into sel=nullptr
+
+    if (const auto* bitsetview_sel = dynamic_cast<const knowhere::BitsetViewIDSelector*>(sel)) {
+        // A specialized case for Knowhere
+        auto bitset = bitsetview_sel->bitset_view;
+        if (!bitset.empty()) {
+            BitsetViewSelectorHelper bitset_helper{bitset};
+            exhaustive_inner_product_seq<ResultHandler, BitsetViewSelectorHelper>(
+                x, y, d, nx, ny, res, bitset_helper);
+            return;
+        }
+    }
+    else if (sel != nullptr) {
+        // default Faiss case if sel is defined
+        IDSelectorHelper ids_helper{sel};
+        exhaustive_inner_product_seq<ResultHandler, IDSelectorHelper>(
+            x, y, d, nx, ny, res, ids_helper);
+        return;
+    }
+
+    // default case if no filter is needed or if it is empty
+    EmptySelectorHelper helper;
+    exhaustive_inner_product_seq<ResultHandler, EmptySelectorHelper>(
+        x, y, d, nx, ny, res, helper);
+}
 
 /*
-/// Baseline version
+// Baseline implementation of exhaustive_L2sqr_seq
 template <class ResultHandler>
 void exhaustive_L2sqr_seq(
         const float* x,
@@ -229,8 +353,6 @@ void exhaustive_L2sqr_seq(
             size_t counter = 0;
 
             for (size_t j = 0; j < ny_n; j += BUFFER_SIZE) {
-                // todo aguzhva: bitset was here
-                //if (bitset.empty() || !bitset.test(j)) {
                 # pragma unroll
                 for (size_t jj = 0; jj < BUFFER_SIZE; jj++) {
                     const bool is_acceptable = selector.is_member(j + jj);
@@ -266,7 +388,6 @@ void exhaustive_L2sqr_seq(
             }
 
             for (size_t j = ny_n; j < ny; j++) {
-                // bitset.empty() translates into use_sel=false
                 const bool is_acceptable = selector.is_member(j);
                 saved_j[counter] = j; counter += is_acceptable ? 1 : 0;
             }
@@ -296,6 +417,8 @@ void exhaustive_L2sqr_seq(
         const IDSelector* __restrict sel) {
     // add different specialized cases here via introducing
     //   helpers which are converted into templates.
+
+    // bitset.empty() translates into sel=nullptr
 
     if (const auto* bitsetview_sel = dynamic_cast<const knowhere::BitsetViewIDSelector*>(sel)) {
         // A specialized case for Knowhere
