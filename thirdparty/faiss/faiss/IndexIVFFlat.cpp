@@ -199,6 +199,7 @@ struct IVFFlatScanner : InvertedListScanner {
     size_t scan_codes(
             size_t list_size,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float* simi,
             idx_t* idxi,
@@ -213,6 +214,9 @@ struct IVFFlatScanner : InvertedListScanner {
             float dis = metric == METRIC_INNER_PRODUCT
                     ? fvec_inner_product(xi, yj, d)
                     : fvec_L2sqr(xi, yj, d);
+            if (code_norms) {
+                dis /= code_norms[j];
+            }
             if (C::cmp(simi[0], dis)) {
                 int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
                 heap_replace_top<C>(k, simi, idxi, dis, id);
@@ -225,6 +229,7 @@ struct IVFFlatScanner : InvertedListScanner {
     void scan_codes_range(
             size_t list_size,
             const uint8_t* codes,
+            const float* code_norms,
             const idx_t* ids,
             float radius,
             RangeQueryResult& res) const override {
@@ -237,6 +242,9 @@ struct IVFFlatScanner : InvertedListScanner {
             float dis = metric == METRIC_INNER_PRODUCT
                     ? fvec_inner_product(xi, yj, d)
                     : fvec_L2sqr(xi, yj, d);
+            if (code_norms) {
+                dis /= code_norms[j];
+            }
             if (C::cmp(radius, dis)) {
                 int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
                 res.add(dis, id);
@@ -354,6 +362,9 @@ struct IVFFlatScanner : InvertedListScanner {
             float dis = metric == METRIC_INNER_PRODUCT
                     ? fvec_inner_product(xi, yj, d)
                     : fvec_L2sqr(xi, yj, d);
+            if (code_norms) {
+                dis /= code_norms[j];
+            }
             if (C::cmp(simi[0], dis)) {
                 int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
                 heap_replace_top<C>(k, simi, idxi, dis, id);
