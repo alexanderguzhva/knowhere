@@ -280,7 +280,7 @@ class Benchmark_float_qps : public Benchmark_knowhere, public ::testing::Test {
 
     // FAISS index params
     const std::vector<std::string> FAISS_FACTORY_STRINGS = {
-        "IVF1024,PQ8np"
+        "HNSW16"
     };
 };
 
@@ -375,6 +375,7 @@ TEST_F(Benchmark_float_qps, TEST_SCANN) {
     }
 }
 */
+
 
 TEST_F(Benchmark_float_qps, TEST_FAISS) {
     index_type_ = knowhere::IndexEnum::INDEX_FAISS;

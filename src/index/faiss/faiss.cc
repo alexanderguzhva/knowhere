@@ -21,6 +21,9 @@
 #include "knowhere/log.h"
 #include "knowhere/utils.h"
 
+#include "faiss/IndexRefine.h"
+#include "faiss/IndexHNSW.h"
+
 namespace knowhere {
 
 class FaissIndexNode : public IndexNode {
@@ -97,7 +100,10 @@ FaissIndexNode::Train(const DataSet& dataset, const Config& cfg) {
         return Status::invalid_args;
     }
 
-    index_.reset(faiss::index_factory(dataset.GetDim(), f_cfg.factory_string.value().c_str(), metric.value()));
+    auto index = faiss::index_factory(dataset.GetDim(), f_cfg.factory_string.value().c_str(), metric.value());
+    //reinterpret_cast<faiss::IndexRefine*>(index)->k_factor = 5;
+    reinterpret_cast<faiss::IndexHNSW*>(index)->hnsw.efConstruction = 100;
+    index_.reset(index);
 
     auto rows = dataset.GetRows();
     auto dim = dataset.GetDim();
@@ -166,8 +172,12 @@ FaissIndexNode::Search(const DataSet& dataset, const Config& cfg, const BitsetVi
                 BitsetViewIDSelector bw_idselector(bitset);
                 faiss::IDSelector* id_selector = (bitset.empty()) ? nullptr : &bw_idselector;
 
-                faiss::IVFSearchParameters search_params;
-                search_params.nprobe = 32;
+                // faiss::IVFSearchParameters search_params;
+                // search_params.nprobe = 32;
+                // search_params.sel = id_selector;
+
+                faiss::SearchParametersHNSW search_params;
+                search_params.efSearch = 100;
                 search_params.sel = id_selector;
 
                 std::unique_ptr<float[]> copied_query = nullptr;
