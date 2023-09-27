@@ -32,6 +32,8 @@ constexpr const char* INDEX_FAISS_IVFPQ = "IVF_PQ";
 constexpr const char* INDEX_FAISS_SCANN = "SCANN";
 constexpr const char* INDEX_FAISS_IVFSQ8 = "IVF_SQ8";
 
+constexpr const char* INDEX_FAISS = "FAISS";
+
 constexpr const char* INDEX_FAISS_GPU_IDMAP = "GPU_FAISS_FLAT";
 constexpr const char* INDEX_FAISS_GPU_IVFFLAT = "GPU_FAISS_IVF_FLAT";
 constexpr const char* INDEX_FAISS_GPU_IVFPQ = "GPU_FAISS_IVF_PQ";
