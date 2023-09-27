@@ -89,6 +89,9 @@ constexpr const char* HNSW_M = "M";
 constexpr const char* EF = "ef";
 constexpr const char* SEED_EF = "seed_ef";
 constexpr const char* OVERVIEW_LEVELS = "overview_levels";
+
+// Faiss params
+constexpr const char* FACTORY_STRING = "factory_string";
 }  // namespace indexparam
 
 using MetricType = std::string;

@@ -58,79 +58,22 @@ class FaissIndexNode : public IndexNode {
     DeserializeFromFile(const std::string& filename, const Config& config) override;
 
     std::unique_ptr<BaseConfig>
-    CreateConfig() const override {
-        return std::make_unique<FaissConfig>();
-    };
+    CreateConfig() const override;
 
     int64_t
-    Dim() const override {
-        if (!index_) {
-            return -1;
-        }
-        return index_->d;
-    };
+    Dim() const override;
 
     int64_t
-    Size() const override {
-        if (!index_) {
-            return 0;
-        }
-        if constexpr (std::is_same<T, faiss::IndexIVFFlat>::value) {
-            auto nb = index_->invlists->compute_ntotal();
-            auto nlist = index_->nlist;
-            auto code_size = index_->code_size;
-            return ((nb + nlist) * (code_size + sizeof(int64_t)));
-        }
-        if constexpr (std::is_same<T, faiss::IndexIVFFlatCC>::value) {
-            auto nb = index_->invlists->compute_ntotal();
-            auto nlist = index_->nlist;
-            auto code_size = index_->code_size;
-            return (nb * code_size + nb * sizeof(int64_t) + nlist * code_size);
-        }
-        if constexpr (std::is_same<T, faiss::IndexIVFPQ>::value) {
-            auto nb = index_->invlists->compute_ntotal();
-            auto code_size = index_->code_size;
-            auto pq = index_->pq;
-            auto nlist = index_->nlist;
-            auto d = index_->d;
-
-            auto capacity = nb * code_size + nb * sizeof(int64_t) + nlist * d * sizeof(float);
-            auto centroid_table = pq.M * pq.ksub * pq.dsub * sizeof(float);
-            auto precomputed_table = nlist * pq.M * pq.ksub * sizeof(float);
-            return (capacity + centroid_table + precomputed_table);
-        }
-        if constexpr (std::is_same<T, faiss::IndexScaNN>::value) {
-            return index_->size();
-        }
-        if constexpr (std::is_same<T, faiss::IndexIVFScalarQuantizer>::value) {
-            auto nb = index_->invlists->compute_ntotal();
-            auto code_size = index_->code_size;
-            auto nlist = index_->nlist;
-            return (nb * code_size + nb * sizeof(int64_t) + 2 * code_size + nlist * code_size);
-        }
-        if constexpr (std::is_same<T, faiss::IndexBinaryIVF>::value) {
-            auto nb = index_->invlists->compute_ntotal();
-            auto nlist = index_->nlist;
-            auto code_size = index_->code_size;
-            return (nb * code_size + nb * sizeof(int64_t) + nlist * code_size);
-        }
-    };
+    Size() const override;
 
     int64_t
-    Count() const override {
-        if (!index_) {
-            return 0;
-        }
-        return index_->ntotal;
-    };
+    Count() const override;
 
     std::string
-    Type() const override {
-        return knowhere::IndexEnum::INDEX_FAISS;
-    };
+    Type() const override;
 
  private:
-    std::unique_ptr<T> index_;
+    std::unique_ptr<faiss::Index> index_;
     std::shared_ptr<ThreadPool> search_pool_;    
 };
 
@@ -141,7 +84,7 @@ FaissIndexNode::FaissIndexNode(const int32_t version, const Object& object) : in
 
 //
 Status
-FaissIndexNode::Train(const DataSet& dataset, const Config& cfg) override {
+FaissIndexNode::Train(const DataSet& dataset, const Config& cfg) {
     const FaissConfig& f_cfg = static_cast<const FaissConfig&>(cfg);
 
     auto metric = Str2FaissMetricType(f_cfg.metric_type.value());
@@ -149,24 +92,24 @@ FaissIndexNode::Train(const DataSet& dataset, const Config& cfg) override {
         LOG_KNOWHERE_WARNING_ << "please check metric type: " << f_cfg.metric_type.value();
         return metric.error();
     }
-    if (f_cfg.factory_string.has_value()) {
+    if (!f_cfg.factory_string.has_value()) {
         LOG_KNOWHERE_WARNING_ << "factory string for faiss index is undefined";
         return Status::invalid_args;
     }
 
-    index = std::make_unique<faiss::Index>(faiss::index_factory(dataset.GetDim(), f_cfg.factory_string.value(), metric.value()));
+    index_.reset(faiss::index_factory(dataset.GetDim(), f_cfg.factory_string.value().c_str(), metric.value()));
 
     auto rows = dataset.GetRows();
     auto dim = dataset.GetDim();
     auto data = dataset.GetTensor();
 
-    index->train(rows, (const float*)data);
+    index_->train(rows, (const float*)data);
     return Status::success;
 }
 
 //
 Status
-FaissIndexNode::Add(const DataSet& dataset, const Config& cfg) override {
+FaissIndexNode::Add(const DataSet& dataset, const Config& cfg) {
     if (!this->index_) {
         LOG_KNOWHERE_ERROR_ << "Can not add data to empty index.";
         return Status::empty_index;
@@ -189,7 +132,7 @@ FaissIndexNode::Add(const DataSet& dataset, const Config& cfg) override {
 
 //
 expected<DataSetPtr>
-FaissIndexNode::Search(const DataSet& dataset, const Config& cfg, const BitsetView& bitset) const override {
+FaissIndexNode::Search(const DataSet& dataset, const Config& cfg, const BitsetView& bitset) const {
     if (!this->index_) {
         LOG_KNOWHERE_WARNING_ << "search on empty index";
         return expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
@@ -209,30 +152,37 @@ FaissIndexNode::Search(const DataSet& dataset, const Config& cfg, const BitsetVi
     auto k = base_cfg.k.value();
     //auto nprobe = ivf_cfg.nprobe.value();
 
-    int64_t* ids(new (std::nothrow) int64_t[rows * k]);
+    faiss::idx_t* ids(new (std::nothrow) faiss::idx_t[rows * k]);
     float* distances(new (std::nothrow) float[rows * k]);
-    int32_t* i_distances = reinterpret_cast<int32_t*>(distances);
     try {
         std::vector<folly::Future<folly::Unit>> futs;
         futs.reserve(rows);
         for (int i = 0; i < rows; ++i) {
             futs.emplace_back(search_pool_->push([&, index = i] {
                 ThreadPool::ScopedOmpSetter setter(1);
-                auto offset = k * index;
-                std::unique_ptr<float[]> copied_query = nullptr;
+                auto cur_ids = ids + k * index;
+                auto cur_dis = distances + k * index;
 
                 BitsetViewIDSelector bw_idselector(bitset);
                 faiss::IDSelector* id_selector = (bitset.empty()) ? nullptr : &bw_idselector;
 
-                faiss::SearchParameters search_params;
+                faiss::IVFSearchParameters search_params;
+                search_params.nprobe = 32;
                 search_params.sel = id_selector;
 
+                std::unique_ptr<float[]> copied_query = nullptr;
                 auto cur_query = (const float*)data + index * dim;
                 if (is_cosine) {
                     copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                     cur_query = copied_query.get();
                 }
-                index_->search(1, cur_data, k, i_distances + offset, ids + offset, &search_params);
+                index_->search(
+                    1, 
+                    cur_query, 
+                    k, 
+                    cur_dis, 
+                    cur_ids, 
+                    &search_params);
             }));
         }
         for (auto& fut : futs) {
@@ -251,7 +201,7 @@ FaissIndexNode::Search(const DataSet& dataset, const Config& cfg, const BitsetVi
 
 //
 expected<DataSetPtr>
-FaissIndexNode::RangeSearch(const DataSet& dataset, const Config& cfg, const BitsetView& bitset) const override {
+FaissIndexNode::RangeSearch(const DataSet& dataset, const Config& cfg, const BitsetView& bitset) const {
     if (!this->index_) {
         LOG_KNOWHERE_WARNING_ << "range search on empty index";
         return expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
@@ -300,7 +250,7 @@ FaissIndexNode::RangeSearch(const DataSet& dataset, const Config& cfg, const Bit
                 }
 
                 //
-                faiss::SearchParameters ivf_search_params;
+                faiss::SearchParameters search_params;
                 search_params.sel = id_selector;
 
                 index_->range_search(1, cur_query, radius, &res, &search_params);
@@ -333,51 +283,26 @@ FaissIndexNode::RangeSearch(const DataSet& dataset, const Config& cfg, const Bit
 
 //
 expected<DataSetPtr>
-FaissIndexNode::GetVectorByIds(const DataSet& dataset) const override {
-    if (!this->index_) {
-        return expected<DataSetPtr>::Err(Status::empty_index, "index not loaded");
-    }
-    if (!this->index_->is_trained) {
-        return expected<DataSetPtr>::Err(Status::index_not_trained, "index not trained");
-    }
-
-    auto dim = Dim();
-    auto rows = dataset.GetRows();
-    auto ids = dataset.GetIds();
-
-    float* data = nullptr;
-    try {
-        data = new float[dim * rows];
-        index_->make_direct_map(true);
-        for (int64_t i = 0; i < rows; i++) {
-            int64_t id = ids[i];
-            assert(id >= 0 && id < index_->ntotal);
-            index_->reconstruct(id, data + i * dim);
-        }
-        return GenResultDataSet(rows, dim, data);
-    } catch (const std::exception& e) {
-        std::unique_ptr<float[]> auto_del(data);
-        LOG_KNOWHERE_WARNING_ << "faiss inner error: " << e.what();
-        return expected<DataSetPtr>::Err(Status::faiss_inner_error, e.what());
-    }
+FaissIndexNode::GetVectorByIds(const DataSet& dataset) const {
+    return expected<DataSetPtr>::Err(Status::not_implemented, "not implemented for FaissIndex");
 }
 
 //
 bool
-FaissIndexNode::HasRawData(const std::string& metric_type) const override {
+FaissIndexNode::HasRawData(const std::string& metric_type) const {
     // todo aguzhva: not implemented
     return false;
 }
 
 //
 expected<DataSetPtr>
-FaissIndexNode::GetIndexMeta(const Config& cfg) const override {
+FaissIndexNode::GetIndexMeta(const Config& cfg) const {
     return expected<DataSetPtr>::Err(Status::not_implemented, "GetIndexMeta not implemented");
 }
 
 //
 Status
-FaissIndexNode::Serialize(BinarySet& binset) const override {
+FaissIndexNode::Serialize(BinarySet& binset) const {
     try {
         MemoryIOWriter writer;
         faiss::write_index(index_.get(), &writer);
@@ -394,8 +319,81 @@ FaissIndexNode::Serialize(BinarySet& binset) const override {
 //
 Status
 FaissIndexNode::Deserialize(const BinarySet& binset, const Config& config) {
+    std::vector<std::string> names = {Type()};
+    auto binary = binset.GetByNames(names);
+    if (binary == nullptr) {
+        LOG_KNOWHERE_ERROR_ << "Invalid binary set.";
+        return Status::invalid_binary_set;
+    }
 
+    MemoryIOReader reader(binary->data.get(), binary->size);
+    try {
+        index_.reset(faiss::read_index(&reader));
+    } catch (const std::exception& e) {
+        LOG_KNOWHERE_WARNING_ << "faiss inner error: " << e.what();
+        return Status::faiss_inner_error;
+    }
+    return Status::success;
 }
+
+//
+Status
+FaissIndexNode::DeserializeFromFile(const std::string& filename, const Config& config) {
+    auto cfg = static_cast<const knowhere::BaseConfig&>(config);
+
+    int io_flags = 0;
+    if (cfg.enable_mmap.value()) {
+        io_flags |= faiss::IO_FLAG_MMAP;
+    }
+    try {
+        index_.reset(faiss::read_index(filename.data(), io_flags));
+    } catch (const std::exception& e) {
+        LOG_KNOWHERE_WARNING_ << "faiss inner error: " << e.what();
+        return Status::faiss_inner_error;
+    }
+    return Status::success;
+}
+
+//
+std::unique_ptr<BaseConfig>
+FaissIndexNode::CreateConfig() const {
+    return std::make_unique<FaissConfig>();
+};
+
+//
+int64_t
+FaissIndexNode::Dim() const {
+    if (!index_) {
+        return -1;
+    }
+    return index_->d;
+};
+
+int64_t
+FaissIndexNode::Size() const {
+    if (!index_) {
+        return 0;
+    }
+
+    // slow and wrong, but universal way of estimating the size
+    faiss::VectorIOWriter writer;
+    faiss::write_index(index_.get(), &writer);
+
+    return writer.data.size();
+};
+
+int64_t
+FaissIndexNode::Count() const {
+    if (!index_) {
+        return 0;
+    }
+    return index_->ntotal;
+};
+
+std::string
+FaissIndexNode::Type() const {
+    return knowhere::IndexEnum::INDEX_FAISS;
+};
 
 KNOWHERE_REGISTER_GLOBAL(FAISS, [](const int32_t& version, const Object& object) {
     return Index<FaissIndexNode>::Create(version, object);
