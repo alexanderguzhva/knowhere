@@ -124,6 +124,58 @@ class Benchmark_float_qps : public Benchmark_knowhere, public ::testing::Test {
         }
     }
 
+    void
+    test_scann(const knowhere::Json& cfg) {
+        auto conf = cfg;
+
+        const auto reorder_k = conf[knowhere::indexparam::REORDER_K].get<int32_t>();
+        const auto with_raw_data = conf[knowhere::indexparam::WITH_RAW_DATA].get<bool>();
+
+        auto find_smallest_nprobe = [&](float expected_recall) -> int32_t {
+            conf[knowhere::meta::TOPK] = topk_;
+            auto ds_ptr = knowhere::GenDataSet(nq_, dim_, xq_);
+
+            int32_t left = 1, right = 256, nprobe;
+            float recall;
+            while (left <= right) {
+                nprobe = left + (right - left) / 2;
+                conf[knowhere::indexparam::NPROBE] = nprobe;
+
+                auto result = index_.Search(*ds_ptr, conf, nullptr);
+                recall = CalcRecall(result.value()->GetIds(), nq_, topk_);
+                printf("[%0.3f s] iterate scann param for recall %.4f: nprobe=%4d, reorder_k=%d, with_raw_data=%d, k=%d, R@=%.4f\n",
+                       get_time_diff(), expected_recall, nprobe, reorder_k, with_raw_data ? 1 : 0, topk_, recall);
+                std::fflush(stdout);
+                if (std::abs(recall - expected_recall) <= 0.0001) {
+                    return nprobe;
+                }
+                if (recall < expected_recall) {
+                    left = nprobe + 1;
+                } else {
+                    right = nprobe - 1;
+                }
+            }
+            return left;
+        };
+
+        for (auto expected_recall : EXPECTED_RECALLs_) {
+            auto nprobe = find_smallest_nprobe(expected_recall);
+            conf[knowhere::indexparam::NPROBE] = nprobe;
+            conf[knowhere::meta::TOPK] = topk_;
+
+            printf("\n[%0.3f s] %s | %s | nprobe=%d, reorder_k=%d, with_raw_data=%d, k=%d, R@=%.4f\n", get_time_diff(),
+                   ann_test_name_.c_str(), index_type_.c_str(), nprobe, reorder_k, with_raw_data ? 1 : 0, topk_, expected_recall);
+            printf("================================================================================\n");
+            for (auto thread_num : THREAD_NUMs_) {
+                CALC_TIME_SPAN(task(conf, thread_num, nq_));
+                printf("  thread_num = %2d, elapse = %6.3fs, VPS = %.3f\n", thread_num, t_diff, nq_ / t_diff);
+                std::fflush(stdout);
+            }
+            printf("================================================================================\n");
+            printf("[%.3f s] Test '%s/%s' done\n\n", get_time_diff(), ann_test_name_.c_str(), index_type_.c_str());
+        }
+    }
+
  private:
     void
     task(const knowhere::Json& conf, int32_t worker_num, int32_t nq_total) {
@@ -191,6 +243,10 @@ class Benchmark_float_qps : public Benchmark_knowhere, public ::testing::Test {
     // HNSW index params
     const std::vector<int32_t> HNSW_Ms_ = {16};
     const std::vector<int32_t> EFCONs_ = {100};
+
+    // SCANN index params
+    const std::vector<int32_t> SCANN_REORDER_K = {256, 512, 768, 1024};
+    const std::vector<bool> SCANN_WITH_RAW_DATA = {true};
 };
 
 TEST_F(Benchmark_float_qps, TEST_IVF_FLAT) {
@@ -263,3 +319,23 @@ TEST_F(Benchmark_float_qps, TEST_HNSW) {
         }
     }
 }
+
+TEST_F(Benchmark_float_qps, TEST_SCANN) {
+    index_type_ = knowhere::IndexEnum::INDEX_FAISS_SCANN;
+
+    knowhere::Json conf = cfg_;
+    for (auto reorder_k : SCANN_REORDER_K) {
+        if (reorder_k < topk_) {
+            continue;
+        }
+
+        conf[knowhere::indexparam::REORDER_K] = reorder_k;
+        for (const auto with_raw_data : SCANN_WITH_RAW_DATA) {
+            conf[knowhere::indexparam::WITH_RAW_DATA] = with_raw_data;
+            std::string index_file_name = get_index_name({reorder_k, with_raw_data});
+            create_index(index_file_name, conf);
+            test_scann(conf);
+        }
+    }
+}
+
