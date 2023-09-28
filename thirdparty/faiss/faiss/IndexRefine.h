@@ -11,6 +11,13 @@
 
 namespace faiss {
 
+struct IndexRefineParameters : SearchParameters {
+    size_t reorder_k = 1;
+    SearchParameters* base_index_params = nullptr;  // non-owning
+
+    virtual ~IndexRefineParameters() = default;
+};
+
 /** Index that queries in a base_index (a fast one) and refines the
  *  results with an exact search, hopefully improving the results.
  */

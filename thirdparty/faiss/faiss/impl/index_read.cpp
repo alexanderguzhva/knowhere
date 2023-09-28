@@ -1091,31 +1091,30 @@ Index* read_index(IOReader* f, int io_flags) {
         read_index_header(imiq, f);
         read_ProductQuantizer(&imiq->pq, f);
         idx = imiq;
+    } else if (h == fourcc("IxRS")) {
+        IndexScaNN* idxsc = new IndexScaNN();
+        read_scann_header(idxsc, f);
+        idxsc->base_index = read_index(f, io_flags);
+        if (idxsc->with_raw_data) {
+            idxsc->refine_index = read_index(f, io_flags);
+        }
+        READ1(idxsc->k_factor);
+        idxsc->own_fields = true;
+        idxsc->own_refine_index = true;
+        idx = idxsc;
     } else if (h == fourcc("IxRF")) {
         IndexRefine* idxrf = new IndexRefine();
-        read_scann_header(idxrf, f);
+        read_index_header(idxrf, f);
         idxrf->base_index = read_index(f, io_flags);
-        if (idxrf->with_raw_data) {
-            idxrf->refine_index = read_index(f, io_flags);
-            if (dynamic_cast<IndexFlat*>(idxrf->refine_index)) {
-                if (dynamic_cast<IndexIVFPQFastScan*>(idxrf->base_index)) {
-                    // this is IndexScaNN
-                    IndexRefine* idxrf_old = idxrf;
-                    idxrf = new IndexScaNN();
-                    *idxrf = *idxrf_old;
-                    delete idxrf_old;
-                } else {
-                    // then make a RefineFlat with it
-                    IndexRefine* idxrf_old = idxrf;
-                    idxrf = new IndexRefineFlat();
-                    *idxrf = *idxrf_old;
-                    delete idxrf_old;
-                }
-            }
-        } else {
-            idxrf->refine_index = nullptr;
-        }
+        idxrf->refine_index = read_index(f, io_flags);
         READ1(idxrf->k_factor);
+        if (dynamic_cast<IndexFlat*>(idxrf->refine_index)) {
+            // then make a RefineFlat with it
+            IndexRefine* idxrf_old = idxrf;
+            idxrf = new IndexRefineFlat();
+            *idxrf = *idxrf_old;
+            delete idxrf_old;
+        }
         idxrf->own_fields = true;
         idxrf->own_refine_index = true;
         idx = idxrf;
@@ -1144,7 +1143,7 @@ Index* read_index(IOReader* f, int io_flags) {
         idx = idxp;
     } else if (
             h == fourcc("IHNf") || h == fourcc("IHNp") || h == fourcc("IHNs") ||
-            h == fourcc("IHN2")) {
+            h == fourcc("IHN2") || h == fourcc("IHNF")) {
         IndexHNSW* idxhnsw = nullptr;
         if (h == fourcc("IHNf"))
             idxhnsw = new IndexHNSWFlat();
@@ -1154,12 +1153,17 @@ Index* read_index(IOReader* f, int io_flags) {
             idxhnsw = new IndexHNSWSQ();
         if (h == fourcc("IHN2"))
             idxhnsw = new IndexHNSW2Level();
+        if (h == fourcc("IHNF"))
+            idxhnsw = new IndexHNSWPQFastScan();
         read_index_header(idxhnsw, f);
         read_HNSW(&idxhnsw->hnsw, f);
         idxhnsw->storage = read_index(f, io_flags);
         idxhnsw->own_fields = true;
         if (h == fourcc("IHNp")) {
             dynamic_cast<IndexPQ*>(idxhnsw->storage)->pq.compute_sdc_table();
+        }
+        if (h == fourcc("IHNF")) {
+            dynamic_cast<IndexPQFastScan*>(idxhnsw->storage)->pq.compute_sdc_table();
         }
         idx = idxhnsw;
     } else if (

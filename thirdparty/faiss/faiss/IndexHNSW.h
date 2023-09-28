@@ -156,6 +156,12 @@ struct IndexHNSWPQ : IndexHNSW {
     void train(idx_t n, const float* x) override;
 };
 
+struct IndexHNSWPQFastScan : IndexHNSW {
+    IndexHNSWPQFastScan();
+    IndexHNSWPQFastScan(int d, int pq_m, int M, int pq_nbits = 4);
+    void train(idx_t n, const float* x) override;
+};
+
 /** SQ index topped with with a HNSW structure to access elements
  *  more efficiently.
  */

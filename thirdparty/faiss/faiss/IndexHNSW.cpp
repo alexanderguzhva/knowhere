@@ -28,6 +28,7 @@
 #include <faiss/Index2Layer.h>
 #include <faiss/IndexFlat.h>
 #include <faiss/IndexIVFPQ.h>
+#include <faiss/IndexPQFastScan.h>
 #include <faiss/impl/AuxIndexStructures.h>
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/utils/Heap.h>
@@ -889,6 +890,23 @@ IndexHNSWPQ::IndexHNSWPQ(int d, int pq_m, int M, int pq_nbits)
 void IndexHNSWPQ::train(idx_t n, const float* x) {
     IndexHNSW::train(n, x);
     (dynamic_cast<IndexPQ*>(storage))->pq.compute_sdc_table();
+}
+
+/**************************************************************
+ * IndexHNSWPQFastScan implementation
+ **************************************************************/
+
+IndexHNSWPQFastScan::IndexHNSWPQFastScan() {}
+
+IndexHNSWPQFastScan::IndexHNSWPQFastScan(int d, int pq_m, int M, int pq_nbits)
+        : IndexHNSW(new IndexPQFastScan(d, pq_m, pq_nbits), M) {
+    own_fields = true;
+    is_trained = false;
+}
+
+void IndexHNSWPQFastScan::train(idx_t n, const float* x) {
+    IndexHNSW::train(n, x);
+    (dynamic_cast<IndexPQFastScan*>(storage))->pq.compute_sdc_table();
 }
 
 /**************************************************************

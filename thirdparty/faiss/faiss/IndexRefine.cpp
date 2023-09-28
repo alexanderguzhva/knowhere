@@ -14,6 +14,8 @@
 #include <faiss/utils/distances.h>
 #include <faiss/utils/utils.h>
 
+#include <csignal>
+
 namespace faiss {
 
 /***************************************************
@@ -99,16 +101,42 @@ void IndexRefine::search(
         idx_t k,
         float* distances,
         idx_t* labels,
-        const SearchParameters* params) const {
-    FAISS_THROW_IF_NOT_MSG(
-            !params, "search params not supported for this index");
+        const SearchParameters* params_in) const {
+
+    printf("foo1 ");
+
+    const IndexRefineParameters* params = nullptr;
+    if (params_in) {
+        params = dynamic_cast<const IndexRefineParameters*>(params_in);
+        FAISS_THROW_IF_NOT_MSG(params, "IndexRefine params have incorrect type");
+    }
+
+    idx_t k_base = (params != nullptr) ? params->reorder_k : idx_t(k * k_factor);
+    SearchParameters* base_index_params = 
+        (params != nullptr) ? params->base_index_params : nullptr;
+
+    printf("foo2 ");
+
+    FAISS_THROW_IF_NOT(k_base >= k);
+
+    printf("foo2a ");
 
     FAISS_THROW_IF_NOT(base_index);
+
+    printf("foo2b ");
+
     FAISS_THROW_IF_NOT(refine_index);
 
+    printf("foo2c ");
+
     FAISS_THROW_IF_NOT(k > 0);
+
+    printf("foo2d ");
+
     FAISS_THROW_IF_NOT(is_trained);
-    idx_t k_base = idx_t(k * k_factor);
+
+    printf("foo2e ");
+
     idx_t* base_labels = labels;
     float* base_distances = distances;
     ScopeDeleter<idx_t> del1;
@@ -121,7 +149,11 @@ void IndexRefine::search(
         del2.set(base_distances);
     }
 
-    base_index->search(n, x, k_base, base_distances, base_labels);
+    printf("foo3 ");
+
+    base_index->search(n, x, k_base, base_distances, base_labels, base_index_params);
+
+    printf("foo4 ");
 
     for (int i = 0; i < n * k_base; i++)
         assert(base_labels[i] >= -1 && base_labels[i] < ntotal);
@@ -145,6 +177,8 @@ void IndexRefine::search(
         }
     }
 
+    printf("foo5 ");
+
     // sort and store result
     if (metric_type == METRIC_L2) {
         typedef CMax<float, idx_t> C;
@@ -158,6 +192,9 @@ void IndexRefine::search(
     } else {
         FAISS_THROW_MSG("Metric type not supported");
     }
+
+    printf("foo6 ");
+
 }
 
 void IndexRefine::reconstruct(idx_t key, float* recons) const {
@@ -221,6 +258,7 @@ IndexRefineFlat::IndexRefineFlat(Index* base_index)
             "base_index should be empty in the beginning");
 }
 
+/* scann implementation
 IndexRefineFlat::IndexRefineFlat(Index* base_index, const float* xb)
         : IndexRefine(base_index, nullptr) {
     is_trained = base_index->is_trained;
@@ -234,6 +272,16 @@ IndexRefineFlat::IndexRefineFlat(Index* base_index, const float* xb)
     // // todo aguzhva: baseline has the following line disabled, but faiss has it enabled
     // refine_index->add(base_index->ntotal, xb);
 }
+*/
+
+// baseline faiss implementation
+IndexRefineFlat::IndexRefineFlat(Index* base_index, const float* xb)
+        : IndexRefine(base_index, nullptr) {
+    is_trained = base_index->is_trained;
+    refine_index = new IndexFlat(base_index->d, base_index->metric_type);
+    own_refine_index = true;
+    refine_index->add(base_index->ntotal, xb);
+}
 
 IndexRefineFlat::IndexRefineFlat() : IndexRefine() {
     own_refine_index = true;
@@ -245,15 +293,25 @@ void IndexRefineFlat::search(
         idx_t k,
         float* distances,
         idx_t* labels,
-        const SearchParameters* params) const {
-    FAISS_THROW_IF_NOT_MSG(
-            !params, "search params not supported for this index");
+        const SearchParameters* params_in) const {
+
+    const IndexRefineParameters* params = nullptr;
+    if (params_in) {
+        params = dynamic_cast<const IndexRefineParameters*>(params_in);
+        FAISS_THROW_IF_NOT_MSG(params, "IndexRefine params have incorrect type");
+    }
+
+    idx_t k_base = (params != nullptr) ? params->reorder_k : idx_t(k * k_factor);
+    SearchParameters* base_index_params = 
+        (params != nullptr) ? params->base_index_params : nullptr;
+
+    FAISS_THROW_IF_NOT(k_base >= k);
+
     FAISS_THROW_IF_NOT(base_index);
     FAISS_THROW_IF_NOT(refine_index);
     
     FAISS_THROW_IF_NOT(k > 0);
     FAISS_THROW_IF_NOT(is_trained);
-    idx_t k_base = idx_t(k * k_factor);
     idx_t* base_labels = labels;
     float* base_distances = distances;
     ScopeDeleter<idx_t> del1;
@@ -266,7 +324,7 @@ void IndexRefineFlat::search(
         del2.set(base_distances);
     }
 
-    base_index->search(n, x, k_base, base_distances, base_labels);
+    base_index->search(n, x, k_base, base_distances, base_labels, base_index_params);
 
     for (int i = 0; i < n * k_base; i++)
         assert(base_labels[i] >= -1 && base_labels[i] < ntotal);

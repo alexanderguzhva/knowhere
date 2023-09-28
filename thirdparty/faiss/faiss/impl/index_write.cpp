@@ -50,6 +50,7 @@
 #include <faiss/IndexRefine.h>
 #include <faiss/IndexRowwiseMinMax.h>
 #include <faiss/IndexScalarQuantizer.h>
+#include <faiss/IndexScaNN.h>
 #include <faiss/MetaIndexes.h>
 #include <faiss/VectorTransform.h>
 
@@ -58,6 +59,8 @@
 #include <faiss/IndexBinaryHNSW.h>
 #include <faiss/IndexBinaryHash.h>
 #include <faiss/IndexBinaryIVF.h>
+
+#include <csignal>
 
 /*************************************************************
  * The I/O format is the content of the class. For objects that are
@@ -917,13 +920,21 @@ void write_index(const Index* idx, IOWriter* f) {
         write_index_header(imiq, f);
         write_ProductQuantizer(&imiq->pq, f);
     } else if (
+            const IndexScaNN* idxsc = dynamic_cast<const IndexScaNN*>(idx)) {
+        uint32_t h = fourcc("IxRS");
+        WRITE1(h);
+        write_scann_header(idxsc, f);
+        write_index(idxsc->base_index, f);
+        if (idxsc->with_raw_data)
+            write_index(idxsc->refine_index, f);
+        WRITE1(idxsc->k_factor);
+    } else if (
             const IndexRefine* idxrf = dynamic_cast<const IndexRefine*>(idx)) {
         uint32_t h = fourcc("IxRF");
         WRITE1(h);
-        write_scann_header(idxrf, f);
+        write_index_header(idxrf, f);
         write_index(idxrf->base_index, f);
-        if (idxrf->with_raw_data)
-            write_index(idxrf->refine_index, f);
+        write_index(idxrf->refine_index, f);
         WRITE1(idxrf->k_factor);
     } else if (
             const IndexIDMap* idxmap = dynamic_cast<const IndexIDMap*>(idx)) {
@@ -939,6 +950,7 @@ void write_index(const Index* idx, IOWriter* f) {
                 : dynamic_cast<const IndexHNSWPQ*>(idx)      ? fourcc("IHNp")
                 : dynamic_cast<const IndexHNSWSQ*>(idx)      ? fourcc("IHNs")
                 : dynamic_cast<const IndexHNSW2Level*>(idx)  ? fourcc("IHN2")
+                : dynamic_cast<const IndexHNSWPQFastScan*>(idx)      ? fourcc("IHNF")
                                                              : 0;
         FAISS_THROW_IF_NOT(h != 0);
         WRITE1(h);
@@ -1020,6 +1032,7 @@ void write_index(const Index* idx, IOWriter* f) {
         write_index_header(imm, f);
         write_index(imm->index, f);
     } else {
+        std::raise(SIGINT);
         FAISS_THROW_MSG("don't know how to serialize this type of index");
     }
 }

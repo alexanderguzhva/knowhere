@@ -443,6 +443,11 @@ IndexHNSW* parse_IndexHNSW(
         return new IndexHNSWFlat(d, hnsw_M, mt);
     }
 
+    if (match("PQ([0-9]+)x4fs(_[0-9]+)?")) {
+        int M = std::stoi(sm[1].str());
+        int nbit = mres_to_int(sm[2], 4, 1);
+        return new IndexHNSWPQFastScan(d, M, hnsw_M, nbit);
+    }
     if (match("PQ([0-9]+)(x[0-9]+)?(np)?")) {
         int M = std::stoi(sm[1].str());
         int nbit = mres_to_int(sm[2], 8, 1);

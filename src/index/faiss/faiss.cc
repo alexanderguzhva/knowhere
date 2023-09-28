@@ -24,6 +24,8 @@
 #include "faiss/IndexRefine.h"
 #include "faiss/IndexHNSW.h"
 
+#include <csignal>
+
 namespace knowhere {
 
 class FaissIndexNode : public IndexNode {
@@ -101,9 +103,15 @@ FaissIndexNode::Train(const DataSet& dataset, const Config& cfg) {
     }
 
     auto index = faiss::index_factory(dataset.GetDim(), f_cfg.factory_string.value().c_str(), metric.value());
-    //reinterpret_cast<faiss::IndexRefine*>(index)->k_factor = 5;
-    reinterpret_cast<faiss::IndexHNSW*>(index)->hnsw.efConstruction = 100;
-    index_.reset(index);
+
+    // auto index_refine = reinterpret_cast<faiss::IndexRefine*>(index);
+    // auto index_hnsw = reinterpret_cast<faiss::IndexHNSW*>(index_refine->base_index);
+    // index_hnsw->hnsw.efConstruction = 100;
+    // index_.reset(index);
+
+    // auto index_hnsw = reinterpret_cast<faiss::IndexHNSW*>(index);
+    // index_hnsw->hnsw.efConstruction = 100;
+    // index_.reset(index);
 
     auto rows = dataset.GetRows();
     auto dim = dataset.GetDim();
@@ -180,18 +188,24 @@ FaissIndexNode::Search(const DataSet& dataset, const Config& cfg, const BitsetVi
                 search_params.efSearch = 100;
                 search_params.sel = id_selector;
 
+                faiss::IndexRefineParameters refine_params;
+                refine_params.reorder_k = 500;
+                refine_params.base_index_params = &search_params;
+
                 std::unique_ptr<float[]> copied_query = nullptr;
                 auto cur_query = (const float*)data + index * dim;
                 if (is_cosine) {
                     copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                     cur_query = copied_query.get();
                 }
+
                 index_->search(
                     1, 
                     cur_query, 
                     k, 
                     cur_dis, 
                     cur_ids, 
+                    //&refine_params);
                     &search_params);
             }));
         }
