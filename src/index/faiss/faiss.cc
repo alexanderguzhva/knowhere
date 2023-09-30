@@ -23,6 +23,8 @@
 
 #include "faiss/IndexRefine.h"
 #include "faiss/IndexHNSW.h"
+#include "faiss/IndexIVFAdditiveQuantizerFastScan.h"
+#include "faiss/IndexAdditiveQuantizer.h"
 
 #include <csignal>
 
@@ -105,6 +107,16 @@ FaissIndexNode::Train(const DataSet& dataset, const Config& cfg) {
     auto index = faiss::index_factory(dataset.GetDim(), f_cfg.factory_string.value().c_str(), metric.value());
 
     // auto index_refine = reinterpret_cast<faiss::IndexRefine*>(index);
+    // auto index_prqf = reinterpret_cast<faiss::IndexIVFProductResidualQuantizerFastScan*>(index_refine->base_index);
+    // for (auto * aq : index_prqf->prq.quantizers) {
+    //     auto rq = reinterpret_cast<faiss::ResidualQuantizer*>(aq);
+    //     rq->use_beam_LUT = 1;
+    //     rq->max_mem_distances = 16 * (size_t(1) << 20);
+    //     rq->train_type = faiss::ResidualQuantizer::Train_default;
+    //     // rq->approx_topk_mode = ApproxTopK_mode_t::APPROX_TOPK_BUCKETS_B16_D2;
+    // }
+    
+    // auto index_refine = reinterpret_cast<faiss::IndexRefine*>(index);
     // auto index_hnsw = reinterpret_cast<faiss::IndexHNSW*>(index_refine->base_index);
     // index_hnsw->hnsw.efConstruction = 100;
     // index_.reset(index);
@@ -167,6 +179,18 @@ FaissIndexNode::Search(const DataSet& dataset, const Config& cfg, const BitsetVi
 
     auto k = base_cfg.k.value();
     //auto nprobe = ivf_cfg.nprobe.value();
+
+
+    // // auto index_refine = reinterpret_cast<faiss::IndexRefine*>(index_.get());
+    // // auto index_prqf = reinterpret_cast<faiss::IndexIVFProductResidualQuantizerFastScan*>(index_refine->base_index);
+    // // for (auto * aq : index_prqf->prq.quantizers) {
+    // //     auto rq = reinterpret_cast<faiss::ResidualQuantizer*>(aq);
+    // //     rq->use_beam_LUT = 1;
+    // //     rq->max_mem_distances = 16 * (size_t(1) << 20);
+    // //     rq->train_type = faiss::ResidualQuantizer::Train_default;
+    // //     rq->approx_topk_mode = ApproxTopK_mode_t::APPROX_TOPK_BUCKETS_B16_D2;
+    // // }
+
 
     faiss::idx_t* ids(new (std::nothrow) faiss::idx_t[rows * k]);
     float* distances(new (std::nothrow) float[rows * k]);

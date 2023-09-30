@@ -283,7 +283,11 @@ class Benchmark_float_qps : public Benchmark_knowhere, public ::testing::Test {
         //"IVF1024,PRQ8x4x4fs_Nrq2x4"
 
         "IVF1024,PQ64x4fs,RFlat"
-        //"IVF1024,RQ16x4fs_Nrq2x4,RFlat"
+        //"IVF1024,PQ64x4fs,Refine(SQ8)"
+
+        //"IVF1024,PRQ16x2x4fs_Nrq2x4,RFlat"
+
+        //"IVF1024,PLSQ4x2x4fs_Nlsq2x4,RFlat"
     };
 };
 

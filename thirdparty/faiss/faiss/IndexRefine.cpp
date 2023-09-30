@@ -103,8 +103,6 @@ void IndexRefine::search(
         idx_t* labels,
         const SearchParameters* params_in) const {
 
-    printf("foo1 ");
-
     const IndexRefineParameters* params = nullptr;
     if (params_in) {
         params = dynamic_cast<const IndexRefineParameters*>(params_in);
@@ -115,27 +113,15 @@ void IndexRefine::search(
     SearchParameters* base_index_params = 
         (params != nullptr) ? params->base_index_params : nullptr;
 
-    printf("foo2 ");
-
     FAISS_THROW_IF_NOT(k_base >= k);
-
-    printf("foo2a ");
 
     FAISS_THROW_IF_NOT(base_index);
 
-    printf("foo2b ");
-
     FAISS_THROW_IF_NOT(refine_index);
-
-    printf("foo2c ");
 
     FAISS_THROW_IF_NOT(k > 0);
 
-    printf("foo2d ");
-
     FAISS_THROW_IF_NOT(is_trained);
-
-    printf("foo2e ");
 
     idx_t* base_labels = labels;
     float* base_distances = distances;
@@ -149,11 +135,7 @@ void IndexRefine::search(
         del2.set(base_distances);
     }
 
-    printf("foo3 ");
-
     base_index->search(n, x, k_base, base_distances, base_labels, base_index_params);
-
-    printf("foo4 ");
 
     for (int i = 0; i < n * k_base; i++)
         assert(base_labels[i] >= -1 && base_labels[i] < ntotal);
@@ -177,8 +159,6 @@ void IndexRefine::search(
         }
     }
 
-    printf("foo5 ");
-
     // sort and store result
     if (metric_type == METRIC_L2) {
         typedef CMax<float, idx_t> C;
@@ -192,9 +172,6 @@ void IndexRefine::search(
     } else {
         FAISS_THROW_MSG("Metric type not supported");
     }
-
-    printf("foo6 ");
-
 }
 
 void IndexRefine::reconstruct(idx_t key, float* recons) const {
