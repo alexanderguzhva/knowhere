@@ -113,6 +113,8 @@ FaissIndexNode::Train(const DataSet& dataset, const Config& cfg) {
     // index_hnsw->hnsw.efConstruction = 100;
     // index_.reset(index);
 
+    index_.reset(index);
+
     auto rows = dataset.GetRows();
     auto dim = dataset.GetDim();
     auto data = dataset.GetTensor();
@@ -180,13 +182,13 @@ FaissIndexNode::Search(const DataSet& dataset, const Config& cfg, const BitsetVi
                 BitsetViewIDSelector bw_idselector(bitset);
                 faiss::IDSelector* id_selector = (bitset.empty()) ? nullptr : &bw_idselector;
 
-                // faiss::IVFSearchParameters search_params;
-                // search_params.nprobe = 32;
-                // search_params.sel = id_selector;
-
-                faiss::SearchParametersHNSW search_params;
-                search_params.efSearch = 100;
+                faiss::IVFSearchParameters search_params;
+                search_params.nprobe = 10;
                 search_params.sel = id_selector;
+
+                // faiss::SearchParametersHNSW search_params;
+                // search_params.efSearch = 100;
+                // search_params.sel = id_selector;
 
                 faiss::IndexRefineParameters refine_params;
                 refine_params.reorder_k = 500;
@@ -205,8 +207,9 @@ FaissIndexNode::Search(const DataSet& dataset, const Config& cfg, const BitsetVi
                     k, 
                     cur_dis, 
                     cur_ids, 
-                    //&refine_params);
-                    &search_params);
+                    &refine_params);
+                    //&search_params);
+                    //nullptr);
             }));
         }
         for (auto& fut : futs) {

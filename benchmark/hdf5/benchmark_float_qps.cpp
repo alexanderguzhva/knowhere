@@ -280,7 +280,10 @@ class Benchmark_float_qps : public Benchmark_knowhere, public ::testing::Test {
 
     // FAISS index params
     const std::vector<std::string> FAISS_FACTORY_STRINGS = {
-        "IVF1024_HNSW32,PQ16x4fs,RFlat"
+        //"IVF1024,PRQ8x4x4fs_Nrq2x4"
+
+        "IVF1024,PQ64x4fs,RFlat"
+        //"IVF1024,RQ16x4fs_Nrq2x4,RFlat"
     };
 };
 
