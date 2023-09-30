@@ -26,6 +26,7 @@
 
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/utils/distances.h>
+#include <faiss/utils/distances_if.h>
 #include <faiss/utils/utils.h>
 
 namespace faiss {
@@ -254,9 +255,6 @@ struct IVFFlatScanner : InvertedListScanner {
 };
 */
 
-// An improved implementation that
-// 1. helps the branch predictor,
-// 2. computes distances for 4 elements per loop
 template <MetricType metric, class C, bool use_sel>
 struct IVFFlatScanner : InvertedListScanner {
     size_t d;
@@ -283,185 +281,77 @@ struct IVFFlatScanner : InvertedListScanner {
 
     size_t scan_codes(
             size_t list_size,
-            const uint8_t* __restrict codes,
-            const float* __restrict code_norms,
-            const idx_t* __restrict ids,
-            float* __restrict simi,
-            idx_t* __restrict idxi,
+            const uint8_t* codes,
+            const float* code_norms,
+            const idx_t* ids,
+            float* simi,
+            idx_t* idxi,
             size_t k) const override {
         const float* list_vecs = (const float*)codes;
         size_t nup = 0;
 
-        constexpr size_t BUFFER_SIZE = 8;
-        const size_t list_size_n = (list_size / BUFFER_SIZE) * BUFFER_SIZE;
-        size_t saved_j[2 * BUFFER_SIZE];
-        size_t counter = 0;
+        // the lambda that filters acceptable elements.
+        auto filter = 
+            [&](const size_t j) { return (!use_sel || sel->is_member(ids[j])); };
 
-        for (size_t j = 0; j < list_size_n; j += BUFFER_SIZE) {
-            # pragma unroll
-            for (size_t jj = 0; jj < BUFFER_SIZE; jj++) {
-                const bool is_acceptable = (!use_sel || sel->is_member(ids[j + jj]));
-                saved_j[counter] = j + jj; counter += is_acceptable ? 1 : 0;
-            }
-
-            if (counter >= 4) {
-                const size_t counter_4 = (counter / 4) * 4;
-                for (size_t iCounter = 0; iCounter < counter_4; iCounter += 4) {
-                    const float* __restrict yj0 = list_vecs + d * saved_j[iCounter + 0];
-                    const float* __restrict yj1 = list_vecs + d * saved_j[iCounter + 1];
-                    const float* __restrict yj2 = list_vecs + d * saved_j[iCounter + 2];
-                    const float* __restrict yj3 = list_vecs + d * saved_j[iCounter + 3];
-
-                    float dis[4] = {0, 0, 0, 0};
-                    if (metric == METRIC_INNER_PRODUCT) {
-                        fvec_inner_product_batch_4(
-                            xi, yj0, yj1, yj2, yj3, d, dis[0], dis[1], dis[2], dis[3]
-                        );
-                    }
-                    else {
-                        fvec_L2sqr_batch_4(
-                            xi, yj0, yj1, yj2, yj3, d, dis[0], dis[1], dis[2], dis[3]
-                        );
-                    }
-
-                    if (code_norms) {
-                        for (size_t jj = 0; jj < 4; jj++) {
-                            dis[jj] /= code_norms[saved_j[iCounter + jj]]; 
-                        }
-                    }
-
-                    for (size_t jj = 0; jj < 4; jj++) {
-                        if (C::cmp(simi[0], dis[jj])) {
-                            int64_t id = store_pairs ? lo_build(list_no, saved_j[iCounter + jj]) : ids[saved_j[iCounter + jj]];
-                            heap_replace_top<C>(k, simi, idxi, dis[jj], id);
-                            nup++;
-                        }
-                    }
+        // the lambda that applies a filtered element.
+        auto apply = 
+            [&](const float dis_in, const size_t j) {
+                const float dis = (code_norms == nullptr) ? dis_in : (dis_in / code_norms[j]); 
+                if (C::cmp(simi[0], dis)) {
+                    const int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
+                    heap_replace_top<C>(k, simi, idxi, dis, id);
+                    nup++;
                 }
+            };
 
-                // copy leftovers to the beginning of the buffer
-                for (size_t jk = counter_4; jk < counter; jk++) {
-                    saved_j[jk - counter_4] = saved_j[jk];
-                }
-
-                // rewind
-                counter -= counter_4;
-            }
+        if constexpr (metric == METRIC_INNER_PRODUCT) {
+            fvec_inner_products_ny_if(
+                xi, list_vecs, d, list_size, filter, apply);
+        }
+        else {
+            fvec_L2sqr_ny_if(
+                xi, list_vecs, d, list_size, filter, apply);
         }
 
-        for (size_t j = list_size_n; j < list_size; j++) {
-            const bool is_acceptable = (!use_sel || sel->is_member(ids[j]));
-            saved_j[counter] = j; counter += is_acceptable ? 1 : 0;
-        }
-
-        // process leftovers
-        for (size_t jj = 0; jj < counter; jj++) {
-            const size_t j = saved_j[jj];
-            const float* yj = list_vecs + d * j;
-
-            float dis = metric == METRIC_INNER_PRODUCT
-                    ? fvec_inner_product(xi, yj, d)
-                    : fvec_L2sqr(xi, yj, d);
-            if (code_norms) {
-                dis /= code_norms[j];
-            }
-            if (C::cmp(simi[0], dis)) {
-                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
-                heap_replace_top<C>(k, simi, idxi, dis, id);
-                nup++;
-            }
-        }
         return nup;
     }
 
     void scan_codes_range(
             size_t list_size,
-            const uint8_t* __restrict codes,
-            const float* __restrict code_norms,
-            const idx_t* __restrict ids,
+            const uint8_t* codes,
+            const float* code_norms,
+            const idx_t* ids,
             float radius,
             RangeQueryResult& res) const override {
         const float* list_vecs = (const float*)codes;
 
-        constexpr size_t BUFFER_SIZE = 8;
-        const size_t list_size_n = (list_size / BUFFER_SIZE) * BUFFER_SIZE;
-        size_t saved_j[2 * BUFFER_SIZE];
-        size_t counter = 0;
+        // the lambda that filters acceptable elements.
+        auto filter = 
+            [&](const size_t j) { return (!use_sel || sel->is_member(ids[j])); };
 
-        for (size_t j = 0; j < list_size_n; j += BUFFER_SIZE) {
-            # pragma unroll
-            for (size_t jj = 0; jj < BUFFER_SIZE; jj++) {
-                const bool is_acceptable = (!use_sel || sel->is_member(ids[j + jj]));
-                saved_j[counter] = j + jj; counter += is_acceptable ? 1 : 0;
-            }
-
-            if (counter >= 4) {
-                const size_t counter_4 = (counter / 4) * 4;
-                for (size_t iCounter = 0; iCounter < counter_4; iCounter += 4) {
-                    const float* __restrict yj0 = list_vecs + d * saved_j[iCounter + 0];
-                    const float* __restrict yj1 = list_vecs + d * saved_j[iCounter + 1];
-                    const float* __restrict yj2 = list_vecs + d * saved_j[iCounter + 2];
-                    const float* __restrict yj3 = list_vecs + d * saved_j[iCounter + 3];
-
-                    float dis[4] = {0, 0, 0, 0};
-                    if (metric == METRIC_INNER_PRODUCT) {
-                        fvec_inner_product_batch_4(
-                            xi, yj0, yj1, yj2, yj3, d, dis[0], dis[1], dis[2], dis[3]
-                        );
-                    }
-                    else {
-                        fvec_L2sqr_batch_4(
-                            xi, yj0, yj1, yj2, yj3, d, dis[0], dis[1], dis[2], dis[3]
-                        );
-                    }
-
-                    if (code_norms) {
-                        for (size_t jj = 0; jj < 4; jj++) {
-                            dis[jj] /= code_norms[saved_j[iCounter + jj]]; 
-                        }
-                    }
-
-                    for (size_t jj = 0; jj < 4; jj++) {
-                        if (C::cmp(radius, dis[jj])) {
-                            int64_t id = store_pairs ? lo_build(list_no, saved_j[iCounter + jj]) : ids[saved_j[iCounter + jj]];
-                            res.add(dis[jj], id);
-                        }
-                    }
+        // the lambda that applies a filtered element.
+        auto apply = 
+            [&](const float dis_in, const size_t j) {
+                const float dis = (code_norms == nullptr) ? dis_in : (dis_in / code_norms[j]); 
+                if (C::cmp(radius, dis)) {
+                    int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
+                    res.add(dis, id);
                 }
+            };
 
-                // copy leftovers to the beginning of the buffer
-                for (size_t jk = counter_4; jk < counter; jk++) {
-                    saved_j[jk - counter_4] = saved_j[jk];
-                }
-
-                // rewind
-                counter -= counter_4;
-            }
+        if constexpr (metric == METRIC_INNER_PRODUCT) {
+            fvec_inner_products_ny_if(
+                xi, list_vecs, d, list_size, filter, apply);
         }
-
-        for (size_t j = list_size_n; j < list_size; j++) {
-            const bool is_acceptable = (!use_sel || sel->is_member(ids[j]));
-            saved_j[counter] = j; counter += is_acceptable ? 1 : 0;
-        }
-
-        // process leftovers
-        for (size_t jj = 0; jj < counter; jj++) {
-            const size_t j = saved_j[jj];
-            const float* yj = list_vecs + d * j;
-
-            float dis = metric == METRIC_INNER_PRODUCT
-                    ? fvec_inner_product(xi, yj, d)
-                    : fvec_L2sqr(xi, yj, d);
-            if (code_norms) {
-                dis /= code_norms[j];
-            }            
-            if (C::cmp(radius, dis)) {
-                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
-                res.add(dis, id);
-            }
+        else {
+            fvec_L2sqr_ny_if(
+                xi, list_vecs, d, list_size, filter, apply);
         }
     }
 };
+
+
 
 // a custom version for Knowhere
 template <MetricType metric, class C, bool use_sel>

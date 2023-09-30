@@ -8,6 +8,7 @@
 // -*- c++ -*-
 
 #include <faiss/utils/distances.h>
+#include <faiss/utils/distances_if.h>
 
 #include <algorithm>
 #include <cassert>
@@ -105,7 +106,7 @@ namespace {
 // support for a particular kind of IDSelector classes. This
 // may be useful if the lion's share of samples are filtered out.
 
-struct EmptySelectorHelper {
+struct IDSelectorAll {
     inline bool is_member(const size_t idx) const {
         return true;
     }
@@ -167,6 +168,7 @@ void exhaustive_inner_product_seq(
 }
 */
 
+/*
 // An improved implementation that
 // 1. helps the branch predictor,
 // 2. computes distances for 4 elements per loop
@@ -248,6 +250,49 @@ void exhaustive_inner_product_seq(
         }
     }
 }
+*/
+
+// An improved implementation that
+// 1. helps the branch predictor,
+// 2. computes distances for 4 elements per loop
+template <class ResultHandler, class SelectorHelper>
+void exhaustive_inner_product_seq(
+        const float* __restrict x,
+        const float* __restrict y,
+        size_t d,
+        size_t nx,
+        size_t ny,
+        ResultHandler& res,
+        const SelectorHelper selector) {
+    using SingleResultHandler = typename ResultHandler::SingleResultHandler;
+    int nt = std::min(int(nx), omp_get_max_threads());
+
+#pragma omp parallel num_threads(nt)
+    {
+        SingleResultHandler resi(res);
+#pragma omp for
+        for (int64_t i = 0; i < nx; i++) {
+            const float* x_i = x + i * d;
+            resi.begin(i);
+
+            // the lambda that filters acceptable elements.
+            auto filter = [&selector](const size_t j) { 
+                return selector.is_member(j); 
+            };
+
+            // the lambda that applies a filtered element.
+            auto apply = [&resi](const float ip, const size_t j) {
+                resi.add_result(ip, j);
+            };
+
+            // compute distances
+            fvec_inner_products_ny_if(x_i, y, d, ny, filter, apply);
+
+            resi.end();
+        }
+    }
+}
+
 
 template <class ResultHandler>
 void exhaustive_inner_product_seq(
@@ -282,8 +327,8 @@ void exhaustive_inner_product_seq(
     }
 
     // default case if no filter is needed or if it is empty
-    EmptySelectorHelper helper;
-    exhaustive_inner_product_seq<ResultHandler, EmptySelectorHelper>(
+    IDSelectorAll helper;
+    exhaustive_inner_product_seq<ResultHandler, IDSelectorAll>(
         x, y, d, nx, ny, res, helper);
 }
 
@@ -324,6 +369,7 @@ void exhaustive_L2sqr_seq(
 }
 */
 
+/*
 // An improved implementation that
 // 1. helps the branch predictor,
 // 2. computes distances for 4 elements per loop
@@ -405,6 +451,48 @@ void exhaustive_L2sqr_seq(
         }
     }
 }
+*/
+
+// An improved implementation that
+// 1. helps the branch predictor,
+// 2. computes distances for 4 elements per loop
+template <class ResultHandler, class SelectorHelper>
+void exhaustive_L2sqr_seq(
+        const float* __restrict x,
+        const float* __restrict y,
+        size_t d,
+        size_t nx,
+        size_t ny,
+        ResultHandler& res,
+        const SelectorHelper selector) {
+    using SingleResultHandler = typename ResultHandler::SingleResultHandler;
+    int nt = std::min(int(nx), omp_get_max_threads());
+
+#pragma omp parallel num_threads(nt)
+    {
+        SingleResultHandler resi(res);
+#pragma omp for
+        for (int64_t i = 0; i < nx; i++) {
+            const float* x_i = x + i * d;
+            resi.begin(i);
+
+            // the lambda that filters acceptable elements.
+            auto filter = [&selector](const size_t j) { 
+                return selector.is_member(j); 
+            };
+
+            // the lambda that applies a filtered element.
+            auto apply = [&resi](const float dis, const size_t j) {
+                resi.add_result(dis, j);
+            };
+
+            // compute distances
+            fvec_L2sqr_ny_if(x_i, y, d, ny, filter, apply);
+
+            resi.end();
+        }
+    }
+}
 
 template <class ResultHandler>
 void exhaustive_L2sqr_seq(
@@ -439,8 +527,8 @@ void exhaustive_L2sqr_seq(
     }
 
     // default case if no filter is needed or if it is empty
-    EmptySelectorHelper helper;
-    exhaustive_L2sqr_seq<ResultHandler, EmptySelectorHelper>(
+    IDSelectorAll helper;
+    exhaustive_L2sqr_seq<ResultHandler, IDSelectorAll>(
         x, y, d, nx, ny, res, helper);
 }
 
