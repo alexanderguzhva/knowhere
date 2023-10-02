@@ -65,6 +65,23 @@ struct Codec4bit_avx512 : public Codec4bit_avx {
 struct Codec6bit_avx512 : public Codec6bit_avx {
     // TODO: can be optimized
     static __m512 decode_16_components(const uint8_t* code, int i) {
+        // const uint16_t* data16_0 = (const uint16_t*)(code + (i >> 2) * 3);
+        // const uint64_t* data64_0 = (const uint64_t*)data16_0;
+        // const uint64_t val_0 = *data64_0;
+        // const uint64_t vext_0 = _pdep_u64(val_0, 0x3F3F3F3F3F3F3F3FULL);
+
+        // const uint16_t* data16_1 = data16_0 + 3;
+        // const uint32_t* data32_1 = (const uint32_t*)data16_1;
+        // const uint64_t val_1 = *data32_1 + ((uint64_t)data16_1[2] << 32);
+        // const uint64_t vext_1 = _pdep_u64(val_1, 0x3F3F3F3F3F3F3F3FULL);
+
+        // const __m128i i8 = _mm_set_epi64x(vext_1, vext_0);
+        // const __m512i i32 = _mm512_cvtepi8_epi32(i8);
+        // const __m512 f8 = _mm512_cvtepi32_ps(i32);
+        // const __m512 half_one_255 = _mm512_set1_ps(0.5f / 63.f);
+        // const __m512 one_255 = _mm512_set1_ps(1.f / 63.f);
+        // return _mm512_fmadd_ps(f8, one_255, half_one_255);
+
         return _mm512_set_ps
             (decode_component(code, i + 15),
              decode_component(code, i + 14),

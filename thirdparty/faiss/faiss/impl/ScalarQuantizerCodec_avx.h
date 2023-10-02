@@ -87,6 +87,17 @@ struct Codec6bit_avx : public Codec6bit {
     }
 
     static __m256 decode_8_components(const uint8_t* code, int i) {
+        // const uint16_t* data16 = (const uint16_t*)(code + (i >> 2) * 3);
+        // const uint32_t* data32 = (const uint32_t*)data16;
+        // const uint64_t val = *data32 + ((uint64_t)data16[2] << 32);
+        // const uint64_t vext = _pdep_u64(val, 0x3F3F3F3F3F3F3F3FULL);
+        // const __m128i i8 = _mm_set1_epi64x(vext);
+        // const __m256i i32 = _mm256_cvtepi8_epi32(i8);
+        // const __m256 f8 = _mm256_cvtepi32_ps(i32);
+        // const __m256 half_one_255 = _mm256_set1_ps(0.5f / 63.f);
+        // const __m256 one_255 = _mm256_set1_ps(1.f / 63.f);
+        // return _mm256_fmadd_ps(f8, one_255, half_one_255);
+    
         __m256i i8 = load6((const uint16_t*)(code + (i >> 2) * 3));
         __m256 f8 = _mm256_cvtepi32_ps(i8);
         // this could also be done with bit manipulations but it is
