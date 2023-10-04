@@ -445,6 +445,62 @@ struct DCTemplate_avx512<Quantizer, Similarity, 16> : SQDistanceComputer {
         return compute_distance(q, code);
     }
 
+    void query_to_codes_batch_4(
+        const uint8_t* __restrict code_0,
+        const uint8_t* __restrict code_1,
+        const uint8_t* __restrict code_2,
+        const uint8_t* __restrict code_3,
+        float& dis0,
+        float& dis1,
+        float& dis2,
+        float& dis3
+    ) const override final {
+
+        Similarity sim0(q);
+        Similarity sim1(q);
+        Similarity sim2(q);
+        Similarity sim3(q);
+
+        sim0.begin_16();
+        sim1.begin_16();
+        sim2.begin_16();
+        sim3.begin_16();
+
+        FAISS_PRAGMA_IMPRECISE_LOOP
+        for (size_t i = 0; i < quant.d; i += 16) {
+            __m512 xi0 = quant.reconstruct_16_components(code_0, i);
+            __m512 xi1 = quant.reconstruct_16_components(code_1, i);
+            __m512 xi2 = quant.reconstruct_16_components(code_2, i);
+            __m512 xi3 = quant.reconstruct_16_components(code_3, i);
+            sim0.add_16_components(xi0);
+            sim1.add_16_components(xi1);
+            sim2.add_16_components(xi2);
+            sim3.add_16_components(xi3);
+        }
+
+        dis0 = sim0.result_16();
+        dis1 = sim1.result_16();
+        dis2 = sim2.result_16();
+        dis3 = sim3.result_16();
+    }
+
+    void distances_batch_4(
+            const idx_t idx0,
+            const idx_t idx1,
+            const idx_t idx2,
+            const idx_t idx3,
+            float& dis0,
+            float& dis1,
+            float& dis2,
+            float& dis3) override {
+        query_to_codes_batch_4(
+            codes + idx0 * code_size,
+            codes + idx1 * code_size,
+            codes + idx2 * code_size,
+            codes + idx3 * code_size,
+            dis0, dis1, dis2, dis3);
+    }
+
     // todo aguzhva: introduce distances_batch_4()
 };
 

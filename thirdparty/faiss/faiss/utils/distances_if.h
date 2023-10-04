@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <tuple>
 
+#include <faiss/impl/DistanceComputer.h>
 #include <faiss/utils/distances.h>
 #include "simd/hook.h"
 
@@ -236,6 +237,49 @@ void fvec_L2sqr_ny_if(
             y + indices[2] * d,
             y + indices[3] * d,
             d,
+            dis[0],
+            dis[1],
+            dis[2],
+            dis[3]
+        );
+    };
+
+    fvec_distance_ny_if<Pred, decltype(distance1), decltype(distance4), Apply, 4, DEFAULT_BUFFER_SIZE>(
+        ny,
+        pred,
+        distance1,
+        distance4,
+        apply
+    );
+}
+
+// compute ny square L2 distance between x vectors x and a set of contiguous y vectors
+//   with filtering and applying filtered elements.
+template<
+    // A predicate for filtering elements. 
+    //   bool Pred(const size_t idx);
+    typename Pred, 
+    // Apply an element.
+    //   void Apply(const float dis, const size_t idx);
+    typename Apply>
+void distance_computer_if(
+        const idx_t* __restrict query_indices,
+        const size_t ny,
+        DistanceComputer* __restrict dc,
+        Pred pred,
+        Apply apply) {    
+    // compute a distance from the query to 1 element
+    auto distance1 = [dc, query_indices](const size_t idx) { 
+        return dc->operator()(query_indices[idx]);
+    };
+
+    // compute distances from the query to 4 elements
+    auto distance4 = [dc, query_indices](const std::array<size_t, 4> indices, std::array<float, 4>& dis) { 
+        dc->distances_batch_4(
+            query_indices[indices[0]],
+            query_indices[indices[1]],
+            query_indices[indices[2]],
+            query_indices[indices[3]],
             dis[0],
             dis[1],
             dis[2],

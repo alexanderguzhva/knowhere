@@ -353,6 +353,7 @@ struct DCTemplate_avx<Quantizer, Similarity, 1>
             : DCTemplate<Quantizer, Similarity, 1>(d, trained) {}
 };
 
+FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 template <class Quantizer, class Similarity>
 struct DCTemplate_avx<Quantizer, Similarity, 8> : SQDistanceComputer {
     using Sim = Similarity;
@@ -401,7 +402,47 @@ struct DCTemplate_avx<Quantizer, Similarity, 8> : SQDistanceComputer {
     float query_to_code(const uint8_t* code) const override final {
         return compute_distance(q, code);
     }
+
+    void query_to_codes_batch_4(
+        const uint8_t* __restrict code_0,
+        const uint8_t* __restrict code_1,
+        const uint8_t* __restrict code_2,
+        const uint8_t* __restrict code_3,
+        float& dis0,
+        float& dis1,
+        float& dis2,
+        float& dis3
+    ) const override final {
+
+        Similarity sim0(q);
+        Similarity sim1(q);
+        Similarity sim2(q);
+        Similarity sim3(q);
+
+        sim0.begin_8();
+        sim1.begin_8();
+        sim2.begin_8();
+        sim3.begin_8();
+
+        FAISS_PRAGMA_IMPRECISE_LOOP
+        for (size_t i = 0; i < quant.d; i += 8) {
+            __m256 xi0 = quant.reconstruct_8_components(code_0, i);
+            __m256 xi1 = quant.reconstruct_8_components(code_1, i);
+            __m256 xi2 = quant.reconstruct_8_components(code_2, i);
+            __m256 xi3 = quant.reconstruct_8_components(code_3, i);
+            sim0.add_8_components(xi0);
+            sim1.add_8_components(xi1);
+            sim2.add_8_components(xi2);
+            sim3.add_8_components(xi3);
+        }
+
+        dis0 = sim0.result_8();
+        dis1 = sim1.result_8();
+        dis2 = sim2.result_8();
+        dis3 = sim3.result_8();
+    }
 };
+FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
 /*******************************************************************
  * DistanceComputerByte: computes distances in the integer domain
