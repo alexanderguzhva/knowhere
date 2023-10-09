@@ -6,6 +6,8 @@
 //struct InvertedListScanner;
 //struct IDSelector;
 
+#include <faiss/utils/distances_if.h>
+
 namespace faiss {
 
 /*******************************************************************
@@ -14,6 +16,11 @@ namespace faiss {
  * It is an InvertedListScanner, but is designed to work with
  * IndexScalarQuantizer as well.
  ********************************************************************/
+
+/* use_sel = 0: don't check selector
+ * = 1: check on ids[j]
+ * = 2: check in j directly (normally ids is nullptr and store_pairs)
+ */
 
 template <class DCClass, int use_sel>
 struct IVFSQScannerIP : InvertedListScanner {
@@ -63,6 +70,7 @@ struct IVFSQScannerIP : InvertedListScanner {
                 continue;
             }
 
+            // todo aguzhva: upgrade
             float accu = accu0 + dc.query_to_code(codes);
 
             if (accu > simi[0]) {
@@ -86,6 +94,7 @@ struct IVFSQScannerIP : InvertedListScanner {
                 continue;
             }
 
+            // todo aguzhva: upgrade
             float accu = accu0 + dc.query_to_code(codes);
             if (accu > radius) {
                 int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
@@ -95,10 +104,60 @@ struct IVFSQScannerIP : InvertedListScanner {
     }
 };
 
+template<
+    // A predicate for filtering elements. 
+    //   std::optional<bool> Pred(const size_t idx);
+    // * return true to accept an element.
+    // * return false to reject an element.
+    // * return std::nullopt to break the iteration loop.
+    typename Pred, 
+    // Apply an element.
+    //   void Apply(const float dis, const size_t idx);
+    typename Apply,
+    typename DCClass>
+void fvec_L2sqr_ny_scalar_if(
+        const DCClass& dc,
+        const uint8_t* __restrict codes,
+        const size_t code_size,
+        const size_t ny,
+        Pred pred,
+        Apply apply) {    
+    // compute a distance from the query to 1 element
+    auto distance1 = [&dc, codes](const size_t idx) { 
+        return dc.query_to_code(codes);
+    };
+
+    // compute distances from the query to 4 elements
+    auto distance4 = [&dc, codes, code_size](const std::array<size_t, 4> indices, std::array<float, 4>& dis) { 
+        dc.query_to_codes_batch_4(
+            codes + indices[0] * code_size,
+            codes + indices[1] * code_size,
+            codes + indices[2] * code_size,
+            codes + indices[3] * code_size,
+            dis[0],
+            dis[1],
+            dis[2],
+            dis[3]
+        );
+    };
+
+    auto remapper = [](const size_t idx) { return idx; };
+
+    fvec_distance_ny_if<Pred, decltype(distance1), decltype(distance4), decltype(remapper), Apply, 4, DEFAULT_BUFFER_SIZE>(
+        ny,
+        pred,
+        distance1,
+        distance4,
+        remapper,
+        apply
+    );
+}
+
 /* use_sel = 0: don't check selector
  * = 1: check on ids[j]
  * = 2: check in j directly (normally ids is nullptr and store_pairs)
  */
+
 template <class DCClass, int use_sel>
 struct IVFSQScannerL2 : InvertedListScanner {
     DCClass dc;
@@ -134,7 +193,7 @@ struct IVFSQScannerL2 : InvertedListScanner {
         }
     }
 
-    void set_list(idx_t list_no, float /*coarse_dis*/) override {
+    void set_list(idx_t list_no, float) override {
         this->list_no = list_no;
         if (by_residual) {
             // shift of x_in wrt centroid
@@ -158,19 +217,39 @@ struct IVFSQScannerL2 : InvertedListScanner {
             idx_t* idxi,
             size_t k) const override {
         size_t nup = 0;
-        for (size_t j = 0; j < list_size; j++, codes += code_size) {
-            if (use_sel && !sel->is_member(use_sel == 1 ? ids[j] : j)) {
-                continue;
-            }
 
-            float dis = dc.query_to_code(codes);
+        // // baseline
+        // for (size_t j = 0; j < list_size; j++, codes += code_size) {
+        //     if (use_sel && !sel->is_member(use_sel == 1 ? ids[j] : j)) {
+        //         continue;
+        //     }
+        //
+        //     float dis = dc.query_to_code(codes);
+        //
+        //     if (dis < simi[0]) {
+        //         int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
+        //         maxheap_replace_top(k, simi, idxi, dis, id);
+        //         nup++;
+        //     }
+        // }        
 
-            if (dis < simi[0]) {
-                int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
-                maxheap_replace_top(k, simi, idxi, dis, id);
-                nup++;
-            }
-        }
+        // the lambda that filters acceptable elements.
+        auto filter = 
+            [&](const size_t j) { return (!use_sel || sel->is_member(use_sel == 1 ? ids[j] : j)); };
+
+        // the lambda that applies a filtered element.
+        auto apply = 
+            [&](const float dis, const size_t j) {
+                if (dis < simi[0]) {
+                    int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];
+                    maxheap_replace_top(k, simi, idxi, dis, id);
+                    nup++;
+                }
+            };
+
+        // compute distances
+        fvec_L2sqr_ny_scalar_if(dc, codes, code_size, list_size, filter, apply);
+
         return nup;
     }
 
@@ -186,6 +265,7 @@ struct IVFSQScannerL2 : InvertedListScanner {
                 continue;
             }
 
+            // todo aguzhva: upgrade
             float dis = dc.query_to_code(codes);
             if (dis < radius) {
                 int64_t id = store_pairs ? lo_build(list_no, j) : ids[j];

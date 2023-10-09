@@ -22,6 +22,7 @@ set(FAISS_TEST_SRCS
   ../../thirdparty/faiss/tests/test_params_override.cpp
   ../../thirdparty/faiss/tests/test_sliding_ivf.cpp
   ../../thirdparty/faiss/tests/test_transfer_invlists.cpp
+  ../../thirdparty/faiss/tests/test_distances_if.cpp
 )
 
 find_package(GTest REQUIRED)
