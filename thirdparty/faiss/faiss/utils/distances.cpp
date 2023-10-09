@@ -281,7 +281,7 @@ void exhaustive_inner_product_seq(
             };
 
             // the lambda that applies a filtered element.
-            auto apply = [&resi](const float ip, const size_t j) {
+            auto apply = [&resi](const float ip, const idx_t j) {
                 resi.add_result(ip, j);
             };
 
@@ -482,7 +482,7 @@ void exhaustive_L2sqr_seq(
             };
 
             // the lambda that applies a filtered element.
-            auto apply = [&resi](const float dis, const size_t j) {
+            auto apply = [&resi](const float dis, const idx_t j) {
                 resi.add_result(dis, j);
             };
 
@@ -1072,11 +1072,32 @@ void fvec_inner_products_by_idx(
         const int64_t* __restrict idsj = ids + j * ny;
         const float* xj = x + j * d;
         float* __restrict ipj = ip + j * ny;
-        for (size_t i = 0; i < ny; i++) {
-            if (idsj[i] < 0)
-                continue;
-            ipj[i] = fvec_inner_product(xj, y + d * idsj[i], d);
-        }
+
+        // // baseline version
+        // for (size_t i = 0; i < ny; i++) {
+        //     if (idsj[i] < 0)
+        //         continue;
+        //     ipj[i] = fvec_inner_product(xj, y + d * idsj[i], d);
+        // }
+
+        // the lambda that filters acceptable elements.
+        auto filter = [=](const size_t i) { return (idsj[i] >= 0); };
+        
+        // the lambda that applies a filtered element.
+        auto apply = [=](const float dis, const size_t i) {
+            ipj[i] = dis;
+        };
+
+        // compute distances
+        fvec_inner_products_ny_by_idx_if(
+            xj,
+            y,
+            idsj,
+            d,
+            ny,
+            filter,
+            apply
+        );
     }
 }
 
@@ -1095,11 +1116,32 @@ void fvec_L2sqr_by_idx(
         const int64_t* __restrict idsj = ids + j * ny;
         const float* xj = x + j * d;
         float* __restrict disj = dis + j * ny;
-        for (size_t i = 0; i < ny; i++) {
-            if (idsj[i] < 0)
-                continue;
-            disj[i] = fvec_L2sqr(xj, y + d * idsj[i], d);
-        }
+
+        // // baseline version
+        // for (size_t i = 0; i < ny; i++) {
+        //     if (idsj[i] < 0)
+        //         continue;
+        //     disj[i] = fvec_L2sqr(xj, y + d * idsj[i], d);
+        // }
+
+        // the lambda that filters acceptable elements.
+        auto filter = [=](const size_t i) { return (idsj[i] >= 0); };
+
+        // the lambda that applies a filtered element.
+        auto apply = [=](const float dis, const size_t i) {
+            disj[i] = dis;
+        };
+
+        // compute distances
+        fvec_L2sqr_ny_by_idx_if(
+            xj,
+            y,
+            idsj,
+            d,
+            ny,
+            filter,
+            apply
+        );
     }
 }
 

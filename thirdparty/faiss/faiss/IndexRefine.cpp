@@ -136,30 +136,34 @@ void IndexRefine::search(
         for (idx_t i = 0; i < n; i++) {
             dc->set_query(x + i * d);
             idx_t ij = i * k_base;
-            /*
-            for (idx_t j = 0; j < k_base; j++) {
-                idx_t idx = base_labels[ij];
-                if (idx < 0)
-                    break;
-                base_distances[ij] = (*dc)(idx);
-                ij++;
-            }
-            */
 
-            // TODO: THIS CODE IS WRONG, THERE'S NO 'BREAK' CLAUSE
+            // // baseline             
+            // for (idx_t j = 0; j < k_base; j++) {
+            //     idx_t idx = base_labels[ij];
+            //     if (idx < 0)
+            //         break;
+            //     base_distances[ij] = (*dc)(idx);
+            //     ij++;
+            // }
 
             // the lambda that filters acceptable elements.
             auto filter = 
-                [&](const size_t j) { return base_labels[j + i * k_base] >= 0; };
+                [&](const size_t j) -> std::optional<bool> { 
+                    // stop iterating if idx < 0
+                    if (base_labels[j + i * k_base] < 0) {
+                        return std::nullopt;
+                    }
+                    // go ahead
+                    return true;
+                };
 
             // the lambda that applies a filtered element.
             auto apply = 
-                [&](const float dis, const size_t j) {
+                [&](const float dis, const idx_t j) {
                     base_distances[j + i * k_base] = dis;
                 };
 
-            distance_computer_if(base_labels, k_base, dc.get(), filter, apply);
-
+            distance_compute_by_idx_if(base_labels, k_base, dc.get(), filter, apply);
         }
     }
 
