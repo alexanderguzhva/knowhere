@@ -288,6 +288,8 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             index = std::make_unique<faiss::IndexIVFFlatCC>(qzr, dim, nlist, ivf_flat_cc_cfg.ssize.value(),
                                                             metric.value(), is_cosine);
             index->train(rows, (const float*)data);
+            // ivfflat_cc has no serialize stage, make map at build stage
+            index->make_direct_map(true, faiss::DirectMap::ConcurrentArray);
         }
         if constexpr (std::is_same<faiss::IndexIVFPQ, T>::value) {
             const IvfPqConfig& ivf_pq_cfg = static_cast<const IvfPqConfig&>(cfg);
@@ -641,7 +643,6 @@ IvfIndexNode<T>::GetVectorByIds(const DataSet& dataset) const {
         uint8_t* data = nullptr;
         try {
             data = new uint8_t[dim * rows / 8];
-            index_->make_direct_map(true);
             for (int64_t i = 0; i < rows; i++) {
                 int64_t id = ids[i];
                 assert(id >= 0 && id < index_->ntotal);
@@ -661,7 +662,6 @@ IvfIndexNode<T>::GetVectorByIds(const DataSet& dataset) const {
         float* data = nullptr;
         try {
             data = new float[dim * rows];
-            index_->make_direct_map(true);
             for (int64_t i = 0; i < rows; i++) {
                 int64_t id = ids[i];
                 assert(id >= 0 && id < index_->ntotal);
@@ -764,8 +764,8 @@ Status
 IvfIndexNode<faiss::IndexIVFFlat>::Serialize(BinarySet& binset) const {
     try {
         MemoryIOWriter writer;
-        LOG_KNOWHERE_INFO_ << "request version " << versoin_.VersionNumber();
-        if (versoin_ <= Version::GetMinimalVersion()) {
+        LOG_KNOWHERE_INFO_ << "request version " << version_.VersionNumber();
+        if (version_ <= Version::GetMinimalVersion()) {
             faiss::write_index_nm(index_.get(), &writer);
             LOG_KNOWHERE_INFO_ << "write IVF_FLAT_NM, file size " << writer.tellg();
         } else {
@@ -776,7 +776,7 @@ IvfIndexNode<faiss::IndexIVFFlat>::Serialize(BinarySet& binset) const {
         binset.Append(Type(), index_data_ptr, writer.tellg());
 
         // append raw data for backward compatible
-        if (versoin_ <= Version::GetMinimalVersion()) {
+        if (version_ <= Version::GetMinimalVersion()) {
             size_t dim = index_->d;
             size_t rows = index_->ntotal;
             size_t raw_data_size = dim * rows * sizeof(float);
@@ -818,7 +818,7 @@ IvfIndexNode<T>::Deserialize(const BinarySet& binset, const Config& config) {
     MemoryIOReader reader(binary->data.get(), binary->size);
     try {
         if constexpr (std::is_same<T, faiss::IndexIVFFlat>::value) {
-            if (versoin_ <= Version::GetMinimalVersion()) {
+            if (version_ <= Version::GetMinimalVersion()) {
                 auto raw_binary = binset.GetByName("RAW_DATA");
                 const BaseConfig& base_cfg = static_cast<const BaseConfig&>(config);
                 ConvertIVFFlat(binset, base_cfg.metric_type.value(), raw_binary->data.get(), raw_binary->size);
@@ -831,6 +831,12 @@ IvfIndexNode<T>::Deserialize(const BinarySet& binset, const Config& config) {
             index_.reset(static_cast<T*>(faiss::read_index_binary(&reader)));
         } else {
             index_.reset(static_cast<T*>(faiss::read_index(&reader)));
+        }
+        if constexpr (!std::is_same_v<T, faiss::IndexScaNN>) {
+            const BaseConfig& base_cfg = static_cast<const BaseConfig&>(config);
+            if (HasRawData(base_cfg.metric_type.value())) {
+                index_->make_direct_map(true);
+            }
         }
     } catch (const std::exception& e) {
         LOG_KNOWHERE_WARNING_ << "faiss inner error: " << e.what();
@@ -853,6 +859,12 @@ IvfIndexNode<T>::DeserializeFromFile(const std::string& filename, const Config& 
             index_.reset(static_cast<T*>(faiss::read_index_binary(filename.data(), io_flags)));
         } else {
             index_.reset(static_cast<T*>(faiss::read_index(filename.data(), io_flags)));
+        }
+        if constexpr (!std::is_same_v<T, faiss::IndexScaNN>) {
+            const BaseConfig& base_cfg = static_cast<const BaseConfig&>(config);
+            if (HasRawData(base_cfg.metric_type.value())) {
+                index_->make_direct_map(true);
+            }
         }
     } catch (const std::exception& e) {
         LOG_KNOWHERE_WARNING_ << "faiss inner error: " << e.what();
