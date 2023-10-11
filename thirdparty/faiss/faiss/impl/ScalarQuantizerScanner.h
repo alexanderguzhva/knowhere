@@ -123,8 +123,8 @@ void fvec_L2sqr_ny_scalar_if(
         Pred pred,
         Apply apply) {    
     // compute a distance from the query to 1 element
-    auto distance1 = [&dc, codes](const size_t idx) { 
-        return dc.query_to_code(codes);
+    auto distance1 = [&dc, codes, code_size](const size_t idx) { 
+        return dc.query_to_code(codes + idx * code_size);
     };
 
     // compute distances from the query to 4 elements
