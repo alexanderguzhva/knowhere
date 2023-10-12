@@ -1212,6 +1212,11 @@ void IndexBinaryIVF::range_search_preassigned(
             scanner->set_query(x + i * code_size);
 
             RangeQueryResult& qres = pres.new_result(i);
+
+            // Milvus-specific
+            // cbe86cf716dc1969fc716c29ccf8ea63e82a2b4c: 
+            //   Adopt new strategy for faiss IVF range search
+
             size_t prev_nres = qres.nres;
 
             for (size_t ik = 0; ik < nprobe; ik++) {

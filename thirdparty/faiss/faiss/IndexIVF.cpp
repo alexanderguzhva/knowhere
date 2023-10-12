@@ -871,46 +871,25 @@ void IndexIVF::range_search_preassigned(
 
                 RangeQueryResult& qres = pres.new_result(i);
 
+                // Milvus-specific
+                // cbe86cf716dc1969fc716c29ccf8ea63e82a2b4c: 
+                //   Adopt new strategy for faiss IVF range search 
+
+                size_t prev_nres = qres.nres;
+
                 for (size_t ik = 0; ik < nprobe; ik++) {
                     scan_list_func(i, ik, qres);
+                    if (qres.nres == prev_nres) break;
+                    prev_nres = qres.nres;
                 }
-            }
-
-        } else if (parallel_mode == 1) {
-            for (size_t i = 0; i < nx; i++) {
-                scanner->set_query(x + i * d);
-
-                RangeQueryResult& qres = pres.new_result(i);
-
-#pragma omp for schedule(dynamic)
-                for (int64_t ik = 0; ik < nprobe; ik++) {
-                    scan_list_func(i, ik, qres);
-                }
-            }
-        } else if (parallel_mode == 2) {
-            RangeQueryResult* qres = nullptr;
-
-#pragma omp for schedule(dynamic)
-            for (idx_t iik = 0; iik < nx * (idx_t)nprobe; iik++) {
-                idx_t i = iik / (idx_t)nprobe;
-                idx_t ik = iik % (idx_t)nprobe;
-                if (qres == nullptr || qres->qno != i) {
-                    qres = &pres.new_result(i);
-                    scanner->set_query(x + i * d);
-                }
-                scan_list_func(i, ik, *qres);
             }
         } else {
+            // Other parallel modes from 1.7.4 were disabled for Milvus.
             FAISS_THROW_FMT("parallel_mode %d not supported\n", parallel_mode);
         }
-        if (parallel_mode == 0) {
-            pres.finalize();
-        } else {
-#pragma omp barrier
-#pragma omp single
-            RangeSearchPartialResult::merge(all_pres, false);
-#pragma omp barrier
-        }
+
+        // Other parallel modes from 1.7.4 were disabled for Milvus.
+        pres.finalize();
     }
 
     if (interrupt) {

@@ -168,90 +168,6 @@ void exhaustive_inner_product_seq(
 }
 */
 
-/*
-// An improved implementation that
-// 1. helps the branch predictor,
-// 2. computes distances for 4 elements per loop
-template <class ResultHandler, class SelectorHelper>
-void exhaustive_inner_product_seq(
-        const float* __restrict x,
-        const float* __restrict y,
-        size_t d,
-        size_t nx,
-        size_t ny,
-        ResultHandler& res,
-        const SelectorHelper selector) {
-    using SingleResultHandler = typename ResultHandler::SingleResultHandler;
-    int nt = std::min(int(nx), omp_get_max_threads());
-
-#pragma omp parallel num_threads(nt)
-    {
-        SingleResultHandler resi(res);
-#pragma omp for
-        for (int64_t i = 0; i < nx; i++) {
-            const float* x_i = x + i * d;
-            resi.begin(i);
-
-            constexpr size_t BUFFER_SIZE = 8;
-            const size_t ny_n = (ny / BUFFER_SIZE) * BUFFER_SIZE;
-            size_t saved_j[2 * BUFFER_SIZE];
-            size_t counter = 0;
-
-            for (size_t j = 0; j < ny_n; j += BUFFER_SIZE) {
-                # pragma unroll
-                for (size_t jj = 0; jj < BUFFER_SIZE; jj++) {
-                    const bool is_acceptable = selector.is_member(j + jj);
-                    saved_j[counter] = j + jj; counter += is_acceptable ? 1 : 0;
-                }
-
-                if (counter >= 4) {
-                    const size_t counter_4 = (counter / 4) * 4;
-                    for (size_t iCounter = 0; iCounter < counter_4; iCounter += 4) {
-                        const float* __restrict y_j0 = y + d * saved_j[iCounter + 0];
-                        const float* __restrict y_j1 = y + d * saved_j[iCounter + 1];
-                        const float* __restrict y_j2 = y + d * saved_j[iCounter + 2];
-                        const float* __restrict y_j3 = y + d * saved_j[iCounter + 3];
-
-                        float dis[4] = {0, 0, 0, 0};
-                        fvec_inner_product_batch_4(
-                            x_i, y_j0, y_j1, y_j2, y_j3, d, dis[0], dis[1], dis[2], dis[3]
-                        );
-
-                        for (size_t jj = 0; jj < 4; jj++) {
-                            resi.add_result(dis[jj], saved_j[iCounter + jj]);
-                        }
-                    }
-
-                    // copy leftovers to the beginning of the buffer
-                    for (size_t jk = counter_4; jk < counter; jk++) {
-                        saved_j[jk - counter_4] = saved_j[jk];
-                    }
-
-                    // rewind
-                    counter -= counter_4;
-                }
-            }
-
-            for (size_t j = ny_n; j < ny; j++) {
-                const bool is_acceptable = selector.is_member(j);
-                saved_j[counter] = j; counter += is_acceptable ? 1 : 0;
-            }
-
-            // process leftovers
-            for (size_t jj = 0; jj < counter; jj++) {
-                const size_t j = saved_j[jj];
-                const float* __restrict y_j = y + d * j;
-
-                float ip = fvec_inner_product(x_i, y_j, d);
-                resi.add_result(ip, j);
-            }
-
-            resi.end();
-        }
-    }
-}
-*/
-
 // An improved implementation that
 // 1. helps the branch predictor,
 // 2. computes distances for 4 elements per loop
@@ -363,90 +279,6 @@ void exhaustive_L2sqr_seq(
                 }
                 y_j += d;
             }
-            resi.end();
-        }
-    }
-}
-*/
-
-/*
-// An improved implementation that
-// 1. helps the branch predictor,
-// 2. computes distances for 4 elements per loop
-template <class ResultHandler, class SelectorHelper>
-void exhaustive_L2sqr_seq(
-        const float* __restrict x,
-        const float* __restrict y,
-        size_t d,
-        size_t nx,
-        size_t ny,
-        ResultHandler& res,
-        const SelectorHelper selector) {
-    using SingleResultHandler = typename ResultHandler::SingleResultHandler;
-    int nt = std::min(int(nx), omp_get_max_threads());
-
-#pragma omp parallel num_threads(nt)
-    {
-        SingleResultHandler resi(res);
-#pragma omp for
-        for (int64_t i = 0; i < nx; i++) {
-            const float* x_i = x + i * d;
-            resi.begin(i);
-
-            constexpr size_t BUFFER_SIZE = 8;
-            const size_t ny_n = (ny / BUFFER_SIZE) * BUFFER_SIZE;
-            size_t saved_j[2 * BUFFER_SIZE];
-            size_t counter = 0;
-
-            for (size_t j = 0; j < ny_n; j += BUFFER_SIZE) {
-                # pragma unroll
-                for (size_t jj = 0; jj < BUFFER_SIZE; jj++) {
-                    const bool is_acceptable = selector.is_member(j + jj);
-                    saved_j[counter] = j + jj; counter += is_acceptable ? 1 : 0;
-                }
-
-                if (counter >= 4) {
-                    const size_t counter_4 = (counter / 4) * 4;
-                    for (size_t iCounter = 0; iCounter < counter_4; iCounter += 4) {
-                        const float* __restrict y_j0 = y + d * saved_j[iCounter + 0];
-                        const float* __restrict y_j1 = y + d * saved_j[iCounter + 1];
-                        const float* __restrict y_j2 = y + d * saved_j[iCounter + 2];
-                        const float* __restrict y_j3 = y + d * saved_j[iCounter + 3];
-
-                        float dis[4] = {0, 0, 0, 0};
-                        fvec_L2sqr_batch_4(
-                            x_i, y_j0, y_j1, y_j2, y_j3, d, dis[0], dis[1], dis[2], dis[3]
-                        );
-
-                        for (size_t jj = 0; jj < 4; jj++) {
-                            resi.add_result(dis[jj], saved_j[iCounter + jj]);
-                        }
-                    }
-
-                    // copy leftovers to the beginning of the buffer
-                    for (size_t jk = counter_4; jk < counter; jk++) {
-                        saved_j[jk - counter_4] = saved_j[jk];
-                    }
-
-                    // rewind
-                    counter -= counter_4;
-                }
-            }
-
-            for (size_t j = ny_n; j < ny; j++) {
-                const bool is_acceptable = selector.is_member(j);
-                saved_j[counter] = j; counter += is_acceptable ? 1 : 0;
-            }
-
-            // process leftovers
-            for (size_t jj = 0; jj < counter; jj++) {
-                const size_t j = saved_j[jj];
-                const float* __restrict y_j = y + d * j;
-
-                float disij = fvec_L2sqr(x_i, y_j, d);
-                resi.add_result(disij, j);
-            }
-
             resi.end();
         }
     }
@@ -1312,6 +1144,7 @@ void inner_product_to_L2sqr(
     }
 }
 
+// todo aguzhva: Faiss 1.7.4, no longer used in IndexFlat::assign and Clustering.
 void elkan_L2_sse(
         const float* x,
         const float* y,

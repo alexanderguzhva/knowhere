@@ -395,7 +395,7 @@ struct IVFFlatBitsetViewScanner : InvertedListScanner {
 
         // the lambda that filters acceptable elements.
         auto filter = 
-            [&](const size_t j) { return (!use_sel || bitset.test(ids[j])); };
+            [&](const size_t j) { return (!use_sel || !bitset.test(ids[j])); };
 
         // the lambda that applies a filtered element.
         auto apply = 
@@ -431,7 +431,7 @@ struct IVFFlatBitsetViewScanner : InvertedListScanner {
 
         // the lambda that filters acceptable elements.
         auto filter = 
-            [&](const size_t j) { return (!use_sel || bitset.test(ids[j])); };
+            [&](const size_t j) { return (!use_sel || !bitset.test(ids[j])); };
 
         // the lambda that applies a filtered element.
         auto apply = 
