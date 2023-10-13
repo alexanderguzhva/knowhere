@@ -6,6 +6,11 @@ knowhere_file_glob(
 knowhere_file_glob(GLOB FAISS_AVX512_SRCS
                    thirdparty/faiss/faiss/impl/*avx512.cpp)
 
+knowhere_file_glob(GLOB FAISS_AVX2_SRCS
+                   thirdparty/faiss/faiss/impl/*avx.cpp
+                   thirdparty/faiss/faiss/impl/pq4_fast_scan_search_qbs.cpp
+                   thirdparty/faiss/faiss/IndexIVFPQFastScan.cpp)
+
 list(REMOVE_ITEM FAISS_SRCS ${FAISS_AVX512_SRCS})
 
 # disable RHNSW
@@ -22,10 +27,10 @@ if(__X86_64)
   add_library(utils_avx OBJECT ${UTILS_AVX_SRC})
   add_library(utils_avx512 OBJECT ${UTILS_AVX512_SRC})
 
-  target_compile_options(utils_sse PRIVATE -msse4.2)
-  target_compile_options(utils_avx PRIVATE -mf16c -mavx2 -mfma)
-  target_compile_options(utils_avx512 PRIVATE -mf16c -mavx512f -mavx512dq
-                                              -mavx512bw -mfma)
+  target_compile_options(utils_sse PRIVATE -msse4.2 -mpopcnt)
+  target_compile_options(utils_avx PRIVATE -mfma -mf16c -mavx2 -mpopcnt)
+  target_compile_options(utils_avx512 PRIVATE -mfma -mf16c -mavx512f -mavx512dq
+                                              -mavx512bw -mpopcnt)
 
   add_library(
     knowhere_utils STATIC
@@ -56,6 +61,17 @@ endif()
 find_package(LAPACK REQUIRED)
 
 if(__X86_64)
+  list(REMOVE_ITEM FAISS_SRCS ${FAISS_AVX2_SRCS})
+
+  add_library(faiss_avx2 OBJECT ${FAISS_AVX2_SRCS})
+  target_compile_options(
+    faiss_avx2
+    PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+            -msse4.2
+            -mavx2
+            -mfma
+            -mf16c
+            -mpopcnt>)
   add_library(faiss_avx512 OBJECT ${FAISS_AVX512_SRCS})
   target_compile_options(
     faiss_avx512
@@ -64,19 +80,19 @@ if(__X86_64)
             -mavx2
             -mfma
             -mf16c
+            -mavx512f
             -mavx512dq
-            -mavx512bw>)
+            -mavx512bw
+            -mpopcnt>)
 
   add_library(faiss STATIC ${FAISS_SRCS})
 
-  add_dependencies(faiss faiss_avx512 knowhere_utils)
+  add_dependencies(faiss faiss_avx2 faiss_avx512 knowhere_utils)
   target_compile_options(
     faiss
     PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
             -msse4.2
-            -mavx2
-            -mfma
-            -mf16c
+            -mpopcnt
             -Wno-sign-compare
             -Wno-unused-variable
             -Wno-reorder
@@ -85,7 +101,7 @@ if(__X86_64)
             -Wno-strict-aliasing>)
   target_link_libraries(
     faiss PUBLIC OpenMP::OpenMP_CXX ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES}
-                 faiss_avx512 knowhere_utils)
+                 faiss_avx2 faiss_avx512 knowhere_utils)
   target_compile_definitions(faiss PRIVATE FINTEGER=int)
 endif()
 
