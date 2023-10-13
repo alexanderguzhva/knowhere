@@ -27,6 +27,8 @@
 
 namespace faiss {
 
+extern uint8_t lookup8bit[256];
+
 #define fast_loop_imp(fun_u64, fun_u8)                 \
     auto a = reinterpret_cast<const uint64_t*>(data1); \
     auto b = reinterpret_cast<const uint64_t*>(data2); \
