@@ -296,10 +296,17 @@ using Csi = CMax<uint16_t, int>;
 INSTANTIATE_ACCUMULATE_Q(SingleResultHandler<Csi>)
 INSTANTIATE_ACCUMULATE_Q(HeapHandler<Csi>)
 INSTANTIATE_ACCUMULATE_Q(ReservoirHandler<Csi>)
+
+using CRSci = CMax<float, int>;
+INSTANTIATE_ACCUMULATE_Q(RangeSearchResultHandler<CRSci>)
+
 using Csi2 = CMin<uint16_t, int>;
 INSTANTIATE_ACCUMULATE_Q(SingleResultHandler<Csi2>)
 INSTANTIATE_ACCUMULATE_Q(HeapHandler<Csi2>)
 INSTANTIATE_ACCUMULATE_Q(ReservoirHandler<Csi2>)
+
+using CRSci2 = CMin<float, int>;
+INSTANTIATE_ACCUMULATE_Q(RangeSearchResultHandler<CRSci2>)
 
 using Cfl = CMax<uint16_t, int64_t>;
 using HHCsl = HeapHandler<Cfl, true>;
@@ -308,6 +315,11 @@ using SHCsl = SingleResultHandler<Cfl, true>;
 INSTANTIATE_ACCUMULATE_Q(HHCsl)
 INSTANTIATE_ACCUMULATE_Q(RHCsl)
 INSTANTIATE_ACCUMULATE_Q(SHCsl)
+
+using CRSfl = CMax<float, int64_t>;
+using RSHCsl = RangeSearchResultHandler<CRSfl, true>;
+INSTANTIATE_ACCUMULATE_Q(RSHCsl)
+
 using Cfl2 = CMin<uint16_t, int64_t>;
 using HHCsl2 = HeapHandler<Cfl2, true>;
 using RHCsl2 = ReservoirHandler<Cfl2, true>;
@@ -315,6 +327,10 @@ using SHCsl2 = SingleResultHandler<Cfl2, true>;
 INSTANTIATE_ACCUMULATE_Q(HHCsl2)
 INSTANTIATE_ACCUMULATE_Q(RHCsl2)
 INSTANTIATE_ACCUMULATE_Q(SHCsl2)
+
+using CRSfl2 = CMin<float, int64_t>;
+using RSHCsl2 = RangeSearchResultHandler<CRSfl2, true>;
+INSTANTIATE_ACCUMULATE_Q(RSHCsl2)
 
 /***************************************************************
  * Packing functions

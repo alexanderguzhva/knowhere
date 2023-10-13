@@ -105,7 +105,8 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t* labels,
             const SearchParameters* params = nullptr) const override;
 
-    /// will just fail
+    // range_search implementation was introduced in Knowhere,
+    //   diff 73f03354568b4bf5a370df6f37e8d56dfc3a9c85
     void range_search(
             idx_t n,
             const float* x,
@@ -122,6 +123,15 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t k,
             float* distances,
             idx_t* labels,
+            const Scaler& scaler,
+            const IVFSearchParameters* params = nullptr) const;
+
+    template <bool is_max, class Scaler>
+    void range_search_dispatch_implem(
+            idx_t n,
+            const float* x,
+            float radius,
+            RangeSearchResult* result,
             const Scaler& scaler,
             const IVFSearchParameters* params = nullptr) const;
 
@@ -167,6 +177,18 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t k,
             float* distances,
             idx_t* labels,
+            int impl,
+            size_t* ndis_out,
+            size_t* nlist_out,
+            const Scaler& scaler,
+            const IVFSearchParameters* params = nullptr) const;
+
+    template <class C, class Scaler>
+    void range_search_implem_12(
+            idx_t n,
+            const float* x,
+            float radius,
+            RangeSearchResult* result,
             int impl,
             size_t* ndis_out,
             size_t* nlist_out,
