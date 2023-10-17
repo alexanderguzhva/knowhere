@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <faiss/utils/binary_distances.h>
+
 namespace faiss {
 
 // BitstringWriter and BitstringReader functions

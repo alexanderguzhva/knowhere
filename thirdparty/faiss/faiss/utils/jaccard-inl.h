@@ -16,7 +16,6 @@
 #define FAISS_JACCARD_INL_H
 
 #include <faiss/utils/binary_distances.h>
-#include <faiss/utils/simdlib.h>
 
 #include <faiss/utils/hamming_distance/common.h>
 
