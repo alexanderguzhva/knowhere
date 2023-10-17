@@ -45,7 +45,7 @@ Level1Quantizer::Level1Quantizer(Index* quantizer, size_t nlist)
     cp.niter = 10;
 }
 
-Level1Quantizer::Level1Quantizer() {}
+Level1Quantizer::Level1Quantizer() = default;
 
 Level1Quantizer::~Level1Quantizer() {
     if (own_fields) {
@@ -172,7 +172,7 @@ IndexIVF::IndexIVF(
     }
 }
 
-IndexIVF::IndexIVF() {}
+IndexIVF::IndexIVF() = default;
 
 void IndexIVF::add(idx_t n, const float* x) {
     add_with_ids(n, x, nullptr);
@@ -559,7 +559,8 @@ void IndexIVF::search_preassigned(
                         const float* code_norms = scode_norms->get();
 
                         if (!store_pairs) {
-                            sids.reset(new InvertedLists::ScopedIds(invlists, key, segment_offset));
+                            sids = std::make_unique<InvertedLists::ScopedIds>(
+                                invlists, key, segment_offset);
                             ids = sids->get();
                         }
                         nheap += scanner->scan_codes(

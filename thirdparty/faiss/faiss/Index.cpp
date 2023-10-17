@@ -20,7 +20,7 @@
 
 namespace faiss {
 
-Index::~Index() {}
+Index::~Index() = default;
 
 void Index::train(idx_t /*n*/, const float* /*x*/) {
     // does nothing by default

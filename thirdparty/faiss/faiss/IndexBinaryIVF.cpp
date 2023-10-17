@@ -47,7 +47,7 @@ IndexBinaryIVF::IndexBinaryIVF(IndexBinary* quantizer, size_t d, size_t nlist, M
     cp.niter = 10;
 }
 
-IndexBinaryIVF::IndexBinaryIVF() {}
+IndexBinaryIVF::IndexBinaryIVF() = default;
 
 void IndexBinaryIVF::add(idx_t n, const uint8_t* x) {
     add_with_ids(n, x, nullptr);
@@ -573,8 +573,8 @@ void search_knn_hamming_heap(
                 const idx_t* ids = nullptr;
 
                 if (!store_pairs) {
-                    sids.reset(
-                            new InvertedLists::ScopedIds(ivf->invlists, key));
+                    sids = std::make_unique<InvertedLists::ScopedIds>(
+                            ivf->invlists, key);
                     ids = sids->get();
                 }
 
