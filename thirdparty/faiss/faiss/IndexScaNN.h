@@ -12,12 +12,21 @@ struct IndexScaNNSearchParameters : SearchParameters {
     virtual ~IndexScaNNSearchParameters() = default;
 };
 
-// todo aguzhva: deprecate this class and update IndexRefine properly
-struct IndexScaNN : IndexRefineFlat {
+struct IndexScaNN : IndexRefine {
     explicit IndexScaNN(Index* base_index);
     IndexScaNN(Index* base_index, const float* xb);
 
     IndexScaNN();
+
+    void train(idx_t n, const float* x) override;
+
+    void add(idx_t n, const float* x) override;
+
+    void reset() override;
+
+    inline bool with_raw_data() const {
+        return (refine_index != nullptr);
+    }
 
     int64_t size();
 
