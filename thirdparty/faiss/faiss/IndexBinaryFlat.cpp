@@ -45,15 +45,13 @@ void IndexBinaryFlat::search(
         int32_t* distances,
         idx_t* labels,
         const SearchParameters* params) const {
-    // // todo aguzhva: the following check was commented out
-    // FAISS_THROW_IF_NOT_MSG(
-    //         !params, "search params not supported for this index");
     FAISS_THROW_IF_NOT(k > 0);
 
     IDSelector* sel = (params == nullptr) ? nullptr : params->sel;
 
-    // todo aguzhva: the following piece of the code was taken from
-    //   knowhere, not from faiss. As a result, query_batch_size and 
+    // ====================================================
+    // The following piece of the code is Knowhere-specific.
+    //   As a result, query_batch_size and 
     //   use_heap variables are not used.
 
     if (metric_type == METRIC_Jaccard) {
@@ -97,6 +95,9 @@ void IndexBinaryFlat::search(
     } else {
         FAISS_ASSERT_FMT(false, "invalid metric type %d", (int)metric_type);
     }
+
+    // The end of Knowhere-specific code. 
+    // ====================================================
 }
 
 size_t IndexBinaryFlat::remove_ids(const IDSelector& sel) {
@@ -131,12 +132,9 @@ void IndexBinaryFlat::range_search(
         float radius,
         RangeSearchResult* result,
         const SearchParameters* params) const {
-    // // todo aguzhva: the following check was commented out
-    // FAISS_THROW_IF_NOT_MSG(
-    //         !params, "search params not supported for this index");
 
-    // todo aguzhva: the following piece of the code was taken from
-    //   knowhere, not from faiss.
+    // ====================================================
+    // The following piece of the code is Knowhere-specific.
 
     IDSelector* sel = (params == nullptr) ? nullptr : params->sel;
 
@@ -177,6 +175,9 @@ void IndexBinaryFlat::range_search(
             FAISS_THROW_FMT("Invalid metric type %d\n", (int)metric_type);
             break;
     }
+
+    // The end of Knowhere-specific code. 
+    // ====================================================
 }
 
 } // namespace faiss

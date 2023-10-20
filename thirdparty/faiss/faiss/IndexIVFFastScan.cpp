@@ -230,7 +230,7 @@ void estimators_from_tables_generic(
         }
 
         if (C::cmp(heap_dis[0], dis)) {
-            // todo aguzhva: heap_replace_top
+            // todo aguzhva: replace with heap_replace_top
             heap_pop<C>(k, heap_dis, heap_ids);
             heap_push<C>(k, heap_dis, heap_ids, dis, ids[j]);
         }

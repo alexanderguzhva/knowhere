@@ -79,8 +79,6 @@ void knn_extra_metrics_template(
             // maxheap_heapify(k, simi, idxi);
             heap_heapify<C>(k, simi, idxi);
             for (j = 0; j < ny; j++) {
-                // todo aguzhva: bitset here
-                // if (bitset.empty() || !bitset.test(j)) {
                 if (!sel || sel->is_member(j)) {
                     float disij = vd(x_i, y_j);
 

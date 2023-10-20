@@ -107,9 +107,6 @@ class FlatIndexNode : public IndexNode {
                             cur_query = copied_query.get();
                         }
 
-                        // // todo aguzhva: bitset was here
-                        // index_->search(1, cur_query, k, cur_dis, cur_ids, bitset);
-
                         faiss::SearchParameters search_params;
                         search_params.sel = id_selector;
 
@@ -118,9 +115,6 @@ class FlatIndexNode : public IndexNode {
                     if constexpr (std::is_same<T, faiss::IndexBinaryFlat>::value) {
                         auto cur_i_dis = reinterpret_cast<int32_t*>(cur_dis);
                         
-                        // // todo aguzhva: bitset was here
-                        // index_->search(1, (const uint8_t*)x + index * dim / 8, k, cur_i_dis, cur_ids, bitset);
-
                         faiss::SearchParameters search_params;
                         search_params.sel = id_selector;
 
@@ -198,8 +192,6 @@ class FlatIndexNode : public IndexNode {
                             copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                             cur_query = copied_query.get();
                         }
-                        // // todo aguzhva: bitset was here
-                        // index_->range_search(1, cur_query, radius, &res, bitset);
 
                         faiss::SearchParameters search_params;
                         search_params.sel = id_selector;
@@ -207,9 +199,6 @@ class FlatIndexNode : public IndexNode {
                         index_->range_search(1, cur_query, radius, &res, &search_params);
                     }
                     if constexpr (std::is_same<T, faiss::IndexBinaryFlat>::value) {
-                        // // todo aguzhva: bitset was here
-                        // index_->range_search(1, (const uint8_t*)xq + index * dim / 8, radius, &res, bitset);
-
                         faiss::SearchParameters search_params;
                         search_params.sel = id_selector;
 

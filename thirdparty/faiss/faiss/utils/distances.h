@@ -243,7 +243,7 @@ void knn_L2sqr(
         const float* y_norm2 = nullptr,
         const IDSelector* sel = nullptr);
 
-// todo aguzhva: not in faiss?
+// Knowhere-specific function
 void knn_cosine(
         const float* x,
         const float* y,
@@ -254,7 +254,7 @@ void knn_cosine(
         float_minheap_array_t* ha,
         const IDSelector* sel = nullptr);
 
-// todo aguzhva: not in faiss?
+// Knowhere-specific function
 void knn_jaccard(
         const float* x,
         const float* y,
@@ -362,7 +362,7 @@ void range_search_inner_product(
         RangeSearchResult* result,
         const IDSelector* sel = nullptr);
 
-// todo aguzhva: not in faiss?
+// Knowhere-specific function
 void range_search_cosine(
         const float* x,
         const float* y,

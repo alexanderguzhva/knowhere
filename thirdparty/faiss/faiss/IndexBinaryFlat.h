@@ -30,7 +30,7 @@ struct IndexBinaryFlat : IndexBinary {
 
     size_t query_batch_size = 32;
 
-    // // todo aguzhva: disabled 
+    // // todo aguzhva: disabled for Knowhere at this moment
     // ApproxTopK_mode_t approx_topk_mode = ApproxTopK_mode_t::EXACT_TOPK;
 
     explicit IndexBinaryFlat(idx_t d);

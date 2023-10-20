@@ -386,10 +386,7 @@ void exhaustive_cosine_seq(
             const float* y_j = y;
             resi.begin(i);
             for (size_t j = 0; j < ny; j++) {
-                // todo aguzhva: bitset was here
-                //if (bitset.empty() || !bitset.test(j)) {
                 if (!sel || sel->is_member(j)) {
-                    // todo aguzhva: this is a slow implementation
                     // todo aguzhva: what if a norm == 0 ?
                     float norm =
                         (y_norms != nullptr) ? y_norms[j]
@@ -453,8 +450,6 @@ void exhaustive_inner_product_blas(
                        &nyi);
             }
 
-            // // todo aguzhva: bitset was here
-            // res.add_results(j0, j1, ip_block.get(), bitset);
             res.add_results(j0, j1, ip_block.get(), sel);
         }
         res.end_multiple();
@@ -541,8 +536,6 @@ void exhaustive_L2sqr_blas(
                     ip_line++;
                 }
             }
-            // // todo aguzhva: bitset was here
-            // res.add_results(j0, j1, ip_block.get(), bitset);
             res.add_results(j0, j1, ip_block.get(), sel);
         }
         res.end_multiple();
@@ -617,8 +610,6 @@ void exhaustive_cosine_blas(
                     ip_line++;
                 }
             }
-            // // todo aguzhva: bitset was here
-            // res.add_results(j0, j1, ip_block.get(), bitset);
             res.add_results(j0, j1, ip_block.get(), sel);
         }
         res.end_multiple();
@@ -687,8 +678,6 @@ static void knn_jaccard_blas(
                 float* ip_line = ip_block + (i - i0) * (j1 - j0);
 
                 for (size_t j = j0; j < j1; j++) {
-                    // // todo aguzhva: bitset was here
-                    // if (bitset.empty() || !bitset.test(j)) {
                     if (!sel || sel->is_member(j)) {
                         float ip = *ip_line;
                         float dis = 1.0 - ip / (x_norms[i] + y_norms[j] - ip);

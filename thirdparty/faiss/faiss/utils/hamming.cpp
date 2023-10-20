@@ -308,8 +308,6 @@ void hamming_range_search(
             RangeQueryResult& qres = pres.new_result(i);
 
             for (size_t j = 0; j < nb; j++) {
-                // todo aguzhva: bitset
-                // if (bitset.empty() || !bitset.test(j)) {
                 if (!sel || sel->is_member(j)) {
                     int dis = hc.compute(yi);
                     if (dis < radius) {

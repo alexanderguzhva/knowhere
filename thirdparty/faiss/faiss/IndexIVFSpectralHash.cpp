@@ -261,9 +261,6 @@ struct IVFScanner : InvertedListScanner {
             size_t k) const override {
         size_t nup = 0;
         for (size_t j = 0; j < list_size; j++) {
-            // // todo aguzhva: bitset was here
-            // if (bitset.empty() || !bitset.test(ids[j])) {
-            // // todo aguzhva: use int64_t instead of ids[j] ?
             if (!sel || sel->is_member(ids[j])) {
                 float dis = hc.compute(codes);
 
@@ -286,9 +283,6 @@ struct IVFScanner : InvertedListScanner {
             float radius,
             RangeQueryResult& res) const override {
         for (size_t j = 0; j < list_size; j++) {
-            // // todo aguzhva: bitset was here
-            // if (bitset.empty() || !bitset.test(ids[j])) {
-            // // todo aguzhva: use int64_t instead of ids[j] ?
             if (!sel || sel->is_member(ids[j])) {
                 float dis = hc.compute(codes);
                 if (dis < radius) {

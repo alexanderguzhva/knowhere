@@ -259,7 +259,6 @@ std::string fourcc_inv_printable(uint32_t x) {
             str += c;
         } else {
             char buf[10];
-            // todo aguzhva: faiss does not have snprintf?
             snprintf(buf, 10, "\\x%02x", c);
             str += buf;
         }

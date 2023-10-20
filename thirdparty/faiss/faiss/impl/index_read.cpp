@@ -750,16 +750,18 @@ Index* read_index(IOReader* f, int io_flags) {
             READ1(idxp->encode_signs);
             READ1(idxp->polysemous_ht);
         }
-        // Old versoins of PQ all had metric_type set to INNER_PRODUCT
+        // Old versions of PQ all had metric_type set to INNER_PRODUCT
         // when they were in fact using L2. Therefore, we force metric type
         // to L2 when the old format is detected
         if (h == fourcc("IxPQ") || h == fourcc("IxPo")) {
             idxp->metric_type = METRIC_L2;
         }
-        // // todo aguzhva: this is the code in the baseline knowhere
-        // if (h == fourcc("IxPq")) {
-        //     idxp->pq.compute_sdc_table ();
-        // }
+
+        // the following "if" block is Knowhere-specific
+        if (h == fourcc("IxPq")) {
+            idxp->pq.compute_sdc_table ();
+        }
+
         idx = idxp;
     } else if (h == fourcc("IxRQ") || h == fourcc("IxRq")) {
         IndexResidualQuantizer* idxr = new IndexResidualQuantizer();

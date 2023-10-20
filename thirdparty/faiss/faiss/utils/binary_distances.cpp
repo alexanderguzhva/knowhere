@@ -212,8 +212,6 @@ void binary_knn_mc(
 
 #pragma omp parallel for
         for (size_t j = 0; j < n2; j++) {
-            // // todo aguzhva: bitset was here
-            // if (bitset.empty() || !bitset.test(j)) {
             if (!sel || sel->is_member(j)) {
                 int thread_no = omp_get_thread_num();
 
@@ -275,8 +273,6 @@ void binary_knn_mc(
                 T hc(bs1 + i * bytes_per_code, bytes_per_code);
                 const uint8_t* bs2_ = bs2 + j0 * bytes_per_code;
                 for (size_t j = j0; j < j1; j++, bs2_ += bytes_per_code) {
-                    // // todo aguzhva: bitset was here
-                    // if (bitset.empty() || !bitset.test(j)) {
                     if (!sel || sel->is_member(j)) {
                         if (hc.compute(bs2_)) {
                             dis[num_i] = 0;
@@ -404,8 +400,6 @@ void binary_knn_hc(
 
 #pragma omp parallel for
         for (size_t j = 0; j < n2; j++) {
-            // // todo aguzhva: bitset was here
-            // if (bitset.empty() || !bitset.test(j)) {
             if (!sel || sel->is_member(j)) {
                 int thread_no = omp_get_thread_num();
 
@@ -466,8 +460,6 @@ void binary_knn_hc(
                 T* __restrict bh_val_ = ha->val + i * k;
                 int64_t* __restrict bh_ids_ = ha->ids + i * k;
                 for (size_t j = j0; j < j1; j++, bs2_ += bytes_per_code) {
-                    // // todo aguzhva: bitset was here
-                    // if (bitset.empty() || !bitset.test(j)) {
                     if (!sel || sel->is_member(j)) {
                         dis = hc.compute(bs2_);
                         if (C::cmp(bh_val_[0], dis)) {
@@ -582,8 +574,6 @@ void binary_range_search(
             MetricComputer mc(a + i * code_size, code_size);
             RangeQueryResult& qres = pres.new_result(i);
             for (size_t j = 0; j < nb; j++) {
-                // todo aguzhva: bitset here
-                //if (bitset.empty() || !bitset.test(j)) {
                 if (!sel || sel->is_member(j)) {
                     T dis = mc.compute(b + j * code_size);
                     if (C::cmp(dis, radius)) {

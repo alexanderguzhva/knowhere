@@ -105,7 +105,6 @@ struct SIMDResultHandler {
     int64_t i0 = 0; // query origin
     int64_t j0 = 0; // db origin
     size_t ntotal;  // ignore excess elements after ntotal
-    // todo aguzhva: bitset was here
     const IDSelector* sel;
 
     /// these fields are used mainly for the IVF variants (with_id_map=true)
@@ -244,8 +243,6 @@ struct SingleResultHandler : SIMDResultHandler<C, with_id_map> {
                 int j = __builtin_ctz(lt_mask);
                 auto real_idx = this->adjust_id(b, j);
                 lt_mask -= 1 << j;
-                // // todo aguzhva: bitset was here
-                // if (this->bitset.empty() || !this->bitset.test(real_idx)) {
                 if (this->sel->is_member(real_idx)) {
                     T dis = d32tab[j];
                     if (C::cmp(res.val, dis)) {
@@ -349,8 +346,6 @@ struct HeapHandler : SIMDResultHandler<C, with_id_map> {
                 int j = __builtin_ctz(lt_mask);
                 auto real_idx = this->adjust_id(b, j);
                 lt_mask -= 1 << j;
-                // // todo aguzhva: bitset was here
-                // if (this->bitset.empty() || !this->bitset.test(real_idx)) {
                 if (this->sel->is_member(real_idx)) {
                     T dis = d32tab[j];
                     if (C::cmp(heap_dis[0], dis)) {
@@ -541,8 +536,6 @@ struct ReservoirHandler : SIMDResultHandler<C, with_id_map> {
                 int j = __builtin_ctz(lt_mask);
                 auto real_idx = this->adjust_id(b, j);
                 lt_mask -= 1 << j;
-                // // todo aguzhva: bitset was here
-                // if (this->bitset.empty() || !this->bitset.test(real_idx)) {
                 if (this->sel->is_member(real_idx)) {
                     T dis = d32tab[j];
                     res.add(dis, real_idx);
@@ -664,8 +657,6 @@ struct RangeSearchResultHandler : SIMDResultHandler<C, with_id_map> {
                 int j = __builtin_ctz(lt_mask);
                 auto real_idx = this->adjust_id(b, j);
                 lt_mask -= 1 << j;
-                // // todo aguzhva: bitset was here
-                // if (this->bitset.empty() || !this->bitset.test(real_idx)) {
                 if (this->sel->is_member(real_idx)) {
                     uint16_t dis = d32tab[j];
                     float real_dis = dis;

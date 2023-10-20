@@ -130,8 +130,6 @@ struct HeapResultHandler {
             const T* dis_tab_i = dis_tab + (j1 - j0) * (i - i0) - j0;
             T thresh = heap_dis[0];
             for (size_t j = j0; j < j1; j++) {
-                // // todo aguzhva: bitsel was here
-                // if (bitset.empty() || !bitset.test(j)) {
                 if (!sel || sel->is_member(j)) {
                     T dis = dis_tab_i[j];
                     if (C::cmp(thresh, dis)) {
@@ -375,8 +373,6 @@ struct ReservoirResultHandler {
             ReservoirTopN<C>& reservoir = reservoirs[i - i0];
             const T* dis_tab_i = dis_tab + (j1 - j0) * (i - i0) - j0;
             for (size_t j = j0; j < j1; j++) {
-                // // todo aguzhva: bitset was here
-                // if (bitset.empty() || !bitset.test(j)) {
                 if (!sel || sel->is_member(j)) {
                     T dis = dis_tab_i[j];
                     reservoir.add(dis, j);
@@ -509,8 +505,6 @@ struct RangeSearchResultHandler {
             RangeQueryResult& qres = pres->new_result(i);
 
             for (size_t j = j0; j < j1; j++) {
-                // // todo aguzhva: bitset was here
-                // if (bitset.empty() || !bitset.test(j)) {
                 if (!sel || sel->is_member(j)) {
                     float dis = *ip_line;
                     if (C::cmp(radius, dis)) {

@@ -50,8 +50,8 @@ struct IndexIDMapTemplate : IndexT {
     /// remove ids adapted to IndexFlat
     size_t remove_ids(const IDSelector& sel) override;
 
-    // todo aguzhva: changed 'distance_t radius' to 'float radius'
-    //   due to IndexBinary needing float due to jaccard distance  
+    // Knowhere-specific: radius became float because of Jaccard distance
+    //   for IndexBinary
     void range_search(
             idx_t n,
             const component_t* x,

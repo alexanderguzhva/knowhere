@@ -143,7 +143,7 @@ struct IndexBinaryIVF : IndexBinary {
             idx_t* labels,
             const SearchParameters* params = nullptr) const override;
 
-    // todo aguzhva: radius because of the jaccard distance
+    // Knowhere-specific: radius became float because of Jaccard distance
     void range_search(
             idx_t n,
             const uint8_t* x,
@@ -151,7 +151,7 @@ struct IndexBinaryIVF : IndexBinary {
             RangeSearchResult* result,
             const SearchParameters* params = nullptr) const override;
 
-    // todo aguzhva: radius because of the jaccard distance
+    // Knowhere-specific: radius became float because of Jaccard distance
     void range_search_preassigned(
             idx_t n,
             const uint8_t* x,
@@ -267,7 +267,7 @@ struct BinaryInvertedListScanner {
             idx_t* labels,
             size_t k) const = 0;
 
-    // todo aguzhva: radius because of the jaccard distance
+    // Knowhere-specific: radius became float because of Jaccard distance
     virtual void scan_codes_range(
             size_t n,
             const uint8_t* codes,

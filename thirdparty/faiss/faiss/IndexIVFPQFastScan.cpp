@@ -134,7 +134,6 @@ void IndexIVFPQFastScan::train_encoder(
 }
 
 void IndexIVFPQFastScan::train(idx_t n, const float* x) {
-    // todo aguzhva: get rid of this 
     if (is_cosine_) {
         auto norm_data = std::make_unique<float[]>(n * d);
         std::memcpy(norm_data.get(), x, n * d * sizeof(float));
@@ -163,7 +162,6 @@ void IndexIVFPQFastScan::add_with_ids(
         idx_t n,
         const float* x,
         const idx_t* xids) {
-    // todo aguzhva: git rid of this
     if (is_cosine_) {
         auto norm_data = std::make_unique<float[]>(n * d);
         std::memcpy(norm_data.get(), x, n * d * sizeof(float));

@@ -416,9 +416,6 @@ IvfIndexNode<T>::Search(const DataSet& dataset, const Config& cfg, const BitsetV
                 if constexpr (std::is_same<T, faiss::IndexBinaryIVF>::value) {
                     auto cur_data = (const uint8_t*)data + index * dim / 8;
 
-                    // // todo aguzhva: bitset was here                    
-                    // index_->search_thread_safe(1, cur_data, k, i_distances + offset, ids + offset, nprobe, bitset);
-
                     faiss::IVFSearchParameters ivf_search_params;
                     ivf_search_params.nprobe = nprobe;
                     ivf_search_params.sel = id_selector;
@@ -436,9 +433,6 @@ IvfIndexNode<T>::Search(const DataSet& dataset, const Config& cfg, const BitsetV
                         cur_query = copied_query.get();
                     }
 
-                    // // todo aguzhva: bitset was here
-                    // index_->search_thread_safe(1, cur_query, k, distances + offset, ids + offset, nprobe, 0, bitset);
-
                     faiss::IVFSearchParameters ivf_search_params;
                     ivf_search_params.nprobe = nprobe;
                     ivf_search_params.max_codes = 0;
@@ -452,10 +446,6 @@ IvfIndexNode<T>::Search(const DataSet& dataset, const Config& cfg, const BitsetV
                         copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         cur_query = copied_query.get();
                     }
-
-                    // // todo aguzhva: bitset was here
-                    // index_->search_thread_safe(1, cur_query, k, distances + offset, ids + offset, nprobe,
-                    //                            scann_cfg.reorder_k.value(), bitset);
 
                     // todo aguzhva: this is somewhat alogical. Refactor?
                     faiss::IVFSearchParameters base_search_params;
@@ -473,9 +463,6 @@ IvfIndexNode<T>::Search(const DataSet& dataset, const Config& cfg, const BitsetV
                         copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         cur_query = copied_query.get();
                     }
-
-                    // // todo aguzhva: bitset was here
-                    // index_->search_thread_safe(1, cur_query, k, distances + offset, ids + offset, nprobe, 0, bitset);
 
                     faiss::IVFSearchParameters ivf_search_params;
                     ivf_search_params.nprobe = nprobe;
@@ -552,8 +539,6 @@ IvfIndexNode<T>::RangeSearch(const DataSet& dataset, const Config& cfg, const Bi
 
                 if constexpr (std::is_same<T, faiss::IndexBinaryIVF>::value) {
                     auto cur_data = (const uint8_t*)xq + index * dim / 8;
-                    // // todo aguzhva: bitset was here
-                    // index_->range_search_thread_safe(1, cur_data, radius, &res, index_->nlist, bitset);
 
                     faiss::IVFSearchParameters ivf_search_params;
                     ivf_search_params.nprobe = index_->nlist;
@@ -566,9 +551,6 @@ IvfIndexNode<T>::RangeSearch(const DataSet& dataset, const Config& cfg, const Bi
                         copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         cur_query = copied_query.get();
                     }
-
-                    // // todo aguzhva: bitset was here
-                    // index_->range_search_thread_safe(1, cur_query, radius, &res, index_->nlist, 0, bitset);
 
                     faiss::IVFSearchParameters ivf_search_params;
                     ivf_search_params.nprobe = index_->nlist;
@@ -583,9 +565,6 @@ IvfIndexNode<T>::RangeSearch(const DataSet& dataset, const Config& cfg, const Bi
                         cur_query = copied_query.get();
                     }
                     
-                    // // todo aguzhva: bitset was here
-                    // index_->range_search_thread_safe(1, cur_query, radius, &res, bitset);
-
                     // todo aguzhva: this is somewhat alogical. Refactor?
                     faiss::IVFSearchParameters base_search_params;
                     base_search_params.sel = id_selector;
@@ -600,8 +579,6 @@ IvfIndexNode<T>::RangeSearch(const DataSet& dataset, const Config& cfg, const Bi
                         copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         cur_query = copied_query.get();
                     }
-                    // // todo aguzhva: bitset was here
-                    // index_->range_search_thread_safe(1, cur_query, radius, &res, index_->nlist, 0, bitset);
 
                     faiss::IVFSearchParameters ivf_search_params;
                     ivf_search_params.nprobe = index_->nlist;

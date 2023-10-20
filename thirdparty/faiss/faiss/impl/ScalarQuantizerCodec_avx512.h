@@ -65,16 +65,19 @@ struct Codec4bit_avx512 : public Codec4bit_avx {
 struct Codec6bit_avx512 : public Codec6bit_avx {
     // TODO: can be optimized
     static __m512 decode_16_components(const uint8_t* code, int i) {
+        // // todo aguzhva: the following piece of code is very fast
+        // //   for Intel chips. AMD ones will be very slow unless Zen3+
+        //
         // const uint16_t* data16_0 = (const uint16_t*)(code + (i >> 2) * 3);
         // const uint64_t* data64_0 = (const uint64_t*)data16_0;
         // const uint64_t val_0 = *data64_0;
         // const uint64_t vext_0 = _pdep_u64(val_0, 0x3F3F3F3F3F3F3F3FULL);
-
+        //
         // const uint16_t* data16_1 = data16_0 + 3;
         // const uint32_t* data32_1 = (const uint32_t*)data16_1;
         // const uint64_t val_1 = *data32_1 + ((uint64_t)data16_1[2] << 32);
         // const uint64_t vext_1 = _pdep_u64(val_1, 0x3F3F3F3F3F3F3F3FULL);
-
+        //
         // const __m128i i8 = _mm_set_epi64x(vext_1, vext_0);
         // const __m512i i32 = _mm512_cvtepi8_epi32(i8);
         // const __m512 f8 = _mm512_cvtepi32_ps(i32);
@@ -500,8 +503,6 @@ struct DCTemplate_avx512<Quantizer, Similarity, 16> : SQDistanceComputer {
             codes + idx3 * code_size,
             dis0, dis1, dis2, dis3);
     }
-
-    // todo aguzhva: introduce distances_batch_4()
 };
 
 /*******************************************************************

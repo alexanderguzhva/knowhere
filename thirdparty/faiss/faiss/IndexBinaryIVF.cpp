@@ -396,8 +396,6 @@ struct IVFBinaryScannerL2 : BinaryInvertedListScanner {
 
         size_t nup = 0;
         for (size_t j = 0; j < n; j++) {
-            // // todo aguzhva: bitset was here
-            // if (bitset.empty() || !bitset.test(ids[j])) {
             if (!this->sel || this->sel->is_member(ids[j])) {
                 auto dis = hc.compute(codes);
                 if (dis < simi[0]) {
@@ -419,8 +417,6 @@ struct IVFBinaryScannerL2 : BinaryInvertedListScanner {
             RangeQueryResult& result) const override {
         size_t nup = 0;
         for (size_t j = 0; j < n; j++) {
-            // // todo aguzhva: bitset was here
-            // if (bitset.empty() || !bitset.test(ids[j])) {
             if (!this->sel || this->sel->is_member(ids[j])) {
                 auto dis = hc.compute(codes);
                 if (dis < radius) {
@@ -467,8 +463,6 @@ struct IVFBinaryScannerJaccard : BinaryInvertedListScanner {
         float* psimi = (float*)simi;
         size_t nup = 0;
         for (size_t j = 0; j < n; j++) {
-            // // todo aguzhva: bitset was here
-            // if (bitset.empty() || !bitset.test(ids[j])) {
             if (!this->sel || this->sel->is_member(ids[j])) {
                 float dis = hc.compute(codes);
                 if (dis < psimi[0]) {
@@ -489,8 +483,6 @@ struct IVFBinaryScannerJaccard : BinaryInvertedListScanner {
             float radius,
             RangeQueryResult& result) const override {
         for (size_t j = 0; j < n; j++) {
-            // // todo aguzhva: bitset was here
-            // if (bitset.empty() || !bitset.test(ids[j])) {
             if (!this->sel || this->sel->is_member(ids[j])) {
                 float dis = hc.compute(codes);
                 if (dis < radius) {
@@ -755,7 +747,6 @@ void search_knn_hamming_count(
                     store_pairs ? nullptr : ivf->invlists->get_ids(key);
 
             for (size_t j = 0; j < list_size; j++) {
-                // // todo aguzhva: bitset was here
                 if (!sel || sel->is_member(ids[j])) {
                     const uint8_t* yj = list_vecs + ivf->code_size * j;
 
@@ -1062,34 +1053,24 @@ void IndexBinaryIVF::search_preassigned(
     
     if (metric_type == METRIC_Jaccard) {
         if (use_heap) {
-            // todo aguzhva: replace with std::vector
-            float* D = new float[k * n];
-            float* c_dis = new float[n * nprobe];
-            // todo: this is an undefined behavior
-            memcpy(c_dis, cdis, sizeof(float) * n * nprobe);
             search_knn_binary_dis_heap(
                     this,
                     n,
                     x,
                     k,
                     cidx,
-                    c_dis,
-                    D,
+                    reinterpret_cast<const float*>(cdis),
+                    reinterpret_cast<float*>(dis),
                     idx,
                     store_pairs,
                     params);
-            memcpy(dis, D, sizeof(float) * n * k);
-            delete[] D;
-            delete[] c_dis;
         } else {
-            // todo aguzhva: add throws
-            // not implemented
+            FAISS_THROW_MSG("a search with !use_heap is not implemented for METRIC_Jaccard");
         }
     } else if (
             metric_type == METRIC_Substructure ||
-            metric_type == METRIC_Superstructure) {
-        // todo aguzhva: add throws
-        // unsupported
+            metric_type == METRIC_Superstructure) { 
+        FAISS_THROW_MSG("a search is not implemented for METRIC_Substructure / METRIC_Superstructure");
     } else {
         // METRIC_Hamming
         if (per_invlist_search) {
@@ -1213,7 +1194,9 @@ void IndexBinaryIVF::range_search_preassigned(
 
             RangeQueryResult& qres = pres.new_result(i);
 
-            // Milvus-specific
+            // ====================================================
+            // The following piece of the code is Knowhere-specific.
+            //
             // cbe86cf716dc1969fc716c29ccf8ea63e82a2b4c: 
             //   Adopt new strategy for faiss IVF range search
 
@@ -1224,6 +1207,9 @@ void IndexBinaryIVF::range_search_preassigned(
                 if (qres.nres == prev_nres) break;
                 prev_nres = qres.nres;
             }
+
+            // The end of Knowhere-specific code. 
+            // ====================================================
         }
 
         pres.finalize();

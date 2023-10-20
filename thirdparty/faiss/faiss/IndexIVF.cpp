@@ -769,6 +769,10 @@ void IndexIVF::range_search_preassigned(
         bool store_pairs,
         const IVFSearchParameters* params,
         IndexIVFStats* stats) const {
+
+    // Knowhere-specific code: 
+    //   only "parallel_mode == 0" branch is supported.
+
     idx_t nprobe = params ? params->nprobe : this->nprobe;
     nprobe = std::min((idx_t)nlist, nprobe);
     FAISS_THROW_IF_NOT(nprobe > 0);
@@ -872,9 +876,11 @@ void IndexIVF::range_search_preassigned(
 
                 RangeQueryResult& qres = pres.new_result(i);
 
-                // Milvus-specific
+                // ====================================================
+                // The following piece of the code is Knowhere-specific.
+                //
                 // cbe86cf716dc1969fc716c29ccf8ea63e82a2b4c: 
-                //   Adopt new strategy for faiss IVF range search 
+                //   Adopt new strategy for faiss IVF range search
 
                 size_t prev_nres = qres.nres;
 
@@ -883,6 +889,9 @@ void IndexIVF::range_search_preassigned(
                     if (qres.nres == prev_nres) break;
                     prev_nres = qres.nres;
                 }
+
+                // The end of Knowhere-specific code. 
+                // ====================================================
             }
         } else {
             // Other parallel modes from 1.7.4 were disabled for Milvus.
@@ -985,6 +994,7 @@ void IndexIVF::search_and_reconstruct(
     FAISS_THROW_IF_NOT(nprobe > 0);
 
     // todo aguzhva: deprecate ScopeDeleter and ScopeDeleter1
+    //   in favor of std::unique_ptr
     idx_t* idx = new idx_t[n * nprobe];
     ScopeDeleter<idx_t> del(idx);
     float* coarse_dis = new float[n * nprobe];
@@ -1228,8 +1238,6 @@ size_t InvertedListScanner::scan_codes(
 
     if (!keep_max) {
         for (size_t j = 0; j < list_size; j++) {
-            // // todo aguzhva: bitset was here
-            // if (bitset.empty() || !bitset.test(j)) {
             // // todo aguzhva: use int64_t id instead of j ?
             if (!sel || sel->is_member(j)) {
                 float dis = distance_to_code(codes);
@@ -1246,8 +1254,6 @@ size_t InvertedListScanner::scan_codes(
         }
     } else {
         for (size_t j = 0; j < list_size; j++) {
-            // // todo aguzhva: bitset was here
-            // if (bitset.empty() || !bitset.test(j)) {
             // // todo aguzhva: use int64_t id instead of j ?
             if (!sel || sel->is_member(j)) {
                 float dis = distance_to_code(codes);
@@ -1307,8 +1313,6 @@ void InvertedListScanner::scan_codes_range(
         float radius,
         RangeQueryResult& res) const {
     for (size_t j = 0; j < list_size; j++) {
-        // // todo aguzhva: bitset was here
-        // if (bitset.empty() || !bitset.test(j)) {
         // // todo aguzhva: use int64_t id instead of j ?
         if (!sel || sel->is_member(j)) {
             float dis = distance_to_code(codes);
