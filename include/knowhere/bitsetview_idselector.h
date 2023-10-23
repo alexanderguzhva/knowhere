@@ -11,21 +11,23 @@
 
 #pragma once
 
-#include "knowhere/bitsetview.h"
-
 #include <faiss/impl/IDSelector.h>
+
+#include "knowhere/bitsetview.h"
 
 namespace knowhere {
 
 struct BitsetViewIDSelector : faiss::IDSelector {
     BitsetView bitset_view;
 
-    inline BitsetViewIDSelector(BitsetView bitset_view) : bitset_view{bitset_view} {}
+    inline BitsetViewIDSelector(BitsetView bitset_view) : bitset_view{bitset_view} {
+    }
 
-    inline bool is_member(faiss::idx_t id) const override final {
+    inline bool
+    is_member(faiss::idx_t id) const override final {
         // it is by design that bitset_view.empty() is not tested here
         return (!bitset_view.test(id));
     }
 };
 
-}
+}  // namespace knowhere

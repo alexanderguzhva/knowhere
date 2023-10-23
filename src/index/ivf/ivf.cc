@@ -22,15 +22,14 @@
 #include "faiss/index_io.h"
 #include "index/ivf/ivf_config.h"
 #include "io/memory_io.h"
-#include "knowhere/comp/thread_pool.h"
 #include "knowhere/bitsetview_idselector.h"
+#include "knowhere/comp/thread_pool.h"
 #include "knowhere/dataset.h"
 #include "knowhere/expected.h"
 #include "knowhere/factory.h"
 #include "knowhere/feder/IVFFlat.h"
 #include "knowhere/log.h"
 #include "knowhere/utils.h"
-
 
 namespace knowhere {
 
@@ -320,8 +319,8 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             const IvfSqConfig& ivf_sq_cfg = static_cast<const IvfSqConfig&>(cfg);
             auto nlist = MatchNlist(rows, ivf_sq_cfg.nlist.value());
             qzr = new (std::nothrow) typename QuantizerT<T>::type(dim, metric.value());
-            index = std::make_unique<faiss::IndexIVFScalarQuantizer>(qzr, dim, nlist, faiss::ScalarQuantizer::QuantizerType::QT_8bit,
-                                                                     metric.value());
+            index = std::make_unique<faiss::IndexIVFScalarQuantizer>(
+                qzr, dim, nlist, faiss::ScalarQuantizer::QuantizerType::QT_8bit, metric.value());
             index->train(rows, (const float*)data);
         }
         if constexpr (std::is_same<faiss::IndexBinaryIVF, T>::value) {
@@ -564,7 +563,7 @@ IvfIndexNode<T>::RangeSearch(const DataSet& dataset, const Config& cfg, const Bi
                         copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
                         cur_query = copied_query.get();
                     }
-                    
+
                     // todo aguzhva: this is somewhat alogical. Refactor?
                     faiss::IVFSearchParameters base_search_params;
                     base_search_params.sel = id_selector;

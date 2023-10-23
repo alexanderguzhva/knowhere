@@ -39,39 +39,21 @@ extern void (*fvec_inner_products_ny)(float*, const float*, const float*, size_t
 /// compute ny square L2 distance between x and a set of transposed contiguous
 /// y vectors. squared lengths of y should be provided as well
 /// todo aguzhva: bring non-ref versions
-extern void (*fvec_L2sqr_ny_transposed)(
-        float*,
-        const float*,
-        const float*,
-        const float*,
-        size_t,
-        size_t,
-        size_t);
+extern void (*fvec_L2sqr_ny_transposed)(float*, const float*, const float*, const float*, size_t, size_t, size_t);
 
 /// compute ny square L2 distance between x and a set of contiguous y vectors
 /// and return the index of the nearest vector.
 /// return 0 if ny == 0.
 /// todo aguzhva: bring non-ref versions
-extern size_t (*fvec_L2sqr_ny_nearest)(
-        float*,
-        const float*,
-        const float*,
-        size_t,
-        size_t);
+extern size_t (*fvec_L2sqr_ny_nearest)(float*, const float*, const float*, size_t, size_t);
 
 /// compute ny square L2 distance between x and a set of transposed contiguous
 /// y vectors and return the index of the nearest vector.
 /// squared lengths of y should be provided as well
 /// return 0 if ny == 0.
 /// todo aguzhva: bring non-ref versions
-extern size_t (*fvec_L2sqr_ny_nearest_y_transposed)(
-        float*,
-        const float*,
-        const float*,
-        const float*,
-        size_t,
-        size_t,
-        size_t);
+extern size_t (*fvec_L2sqr_ny_nearest_y_transposed)(float*, const float*, const float*, const float*, size_t, size_t,
+                                                    size_t);
 
 extern void (*fvec_madd)(size_t, const float*, float, const float*, float*);
 extern int (*fvec_madd_and_argmin)(size_t, const float*, float, const float*, float*);
@@ -79,33 +61,14 @@ extern int (*fvec_madd_and_argmin)(size_t, const float*, float, const float*, fl
 /// Special version of inner product that computes 4 distances
 /// between x and yi, which is performance oriented.
 /// todo aguzhva: bring non-ref versions
-extern void (*fvec_inner_product_batch_4)(
-        const float*,
-        const float*,
-        const float*,
-        const float*,
-        const float*,
-        const size_t,
-        float&,
-        float&,
-        float&,
-        float&);
+extern void (*fvec_inner_product_batch_4)(const float*, const float*, const float*, const float*, const float*,
+                                          const size_t, float&, float&, float&, float&);
 
 /// Special version of L2sqr that computes 4 distances
 /// between x and yi, which is performance oriented.
 /// todo aguzhva: bring non-ref versions
-extern void (*fvec_L2sqr_batch_4)(
-        const float*,
-        const float*,
-        const float*,
-        const float*,
-        const float*,
-        const size_t,
-        float&,
-        float&,
-        float&,
-        float&);
-
+extern void (*fvec_L2sqr_batch_4)(const float*, const float*, const float*, const float*, const float*, const size_t,
+                                  float&, float&, float&, float&);
 
 #if defined(__x86_64__)
 extern bool use_avx512;

@@ -165,17 +165,9 @@ FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 // trust the compiler to unroll this properly
 FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
 void
-fvec_inner_product_batch_4_avx(
-        const float* __restrict x,
-        const float* __restrict y0,
-        const float* __restrict y1,
-        const float* __restrict y2,
-        const float* __restrict y3,
-        const size_t d,
-        float& dis0,
-        float& dis1,
-        float& dis2,
-        float& dis3) {
+fvec_inner_product_batch_4_avx(const float* __restrict x, const float* __restrict y0, const float* __restrict y1,
+                               const float* __restrict y2, const float* __restrict y3, const size_t d, float& dis0,
+                               float& dis1, float& dis2, float& dis3) {
     float d0 = 0;
     float d1 = 0;
     float d2 = 0;
@@ -197,18 +189,9 @@ FAISS_PRAGMA_IMPRECISE_FUNCTION_END
 
 // trust the compiler to unroll this properly
 FAISS_PRAGMA_IMPRECISE_FUNCTION_BEGIN
-void 
-fvec_L2sqr_batch_4_avx(
-        const float* x,
-        const float* y0,
-        const float* y1,
-        const float* y2,
-        const float* y3,
-        const size_t d,
-        float& dis0,
-        float& dis1,
-        float& dis2,
-        float& dis3) {
+void
+fvec_L2sqr_batch_4_avx(const float* x, const float* y0, const float* y1, const float* y2, const float* y3,
+                       const size_t d, float& dis0, float& dis1, float& dis2, float& dis3) {
     float d0 = 0;
     float d1 = 0;
     float d2 = 0;
@@ -231,7 +214,6 @@ fvec_L2sqr_batch_4_avx(
     dis3 = d3;
 }
 FAISS_PRAGMA_IMPRECISE_FUNCTION_END
-
 
 }  // namespace faiss
 #endif

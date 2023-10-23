@@ -18,13 +18,12 @@
 #include "faiss/MetricType.h"
 #include "faiss/utils/binary_distances.h"
 #include "faiss/utils/distances.h"
-#include "knowhere/comp/thread_pool.h"
 #include "knowhere/bitsetview_idselector.h"
+#include "knowhere/comp/thread_pool.h"
 #include "knowhere/config.h"
 #include "knowhere/expected.h"
 #include "knowhere/log.h"
 #include "knowhere/utils.h"
-
 
 namespace knowhere {
 
@@ -288,8 +287,8 @@ BruteForce::RangeSearch(const DataSetPtr base_dataset, const DataSetPtr query_da
                     auto cur_query = (const float*)xq + dim * index;
                     if (is_cosine) {
                         auto copied_query = CopyAndNormalizeVecs(cur_query, 1, dim);
-                        faiss::range_search_cosine(copied_query.get(), (const float*)xb, nullptr, dim, 1, nb, radius, &res,
-                                                   id_selector);
+                        faiss::range_search_cosine(copied_query.get(), (const float*)xb, nullptr, dim, 1, nb, radius,
+                                                   &res, id_selector);
                     } else {
                         faiss::range_search_inner_product(cur_query, (const float*)xb, dim, 1, nb, radius, &res,
                                                           id_selector);
@@ -298,8 +297,9 @@ BruteForce::RangeSearch(const DataSetPtr base_dataset, const DataSetPtr query_da
                 }
                 case faiss::METRIC_Jaccard: {
                     auto cur_query = (const uint8_t*)xq + (dim / 8) * index;
-                    faiss::binary_range_search<faiss::CMin<float, int64_t>, float>(
-                        faiss::METRIC_Jaccard, cur_query, (const uint8_t*)xb, 1, nb, radius, dim / 8, &res, id_selector);
+                    faiss::binary_range_search<faiss::CMin<float, int64_t>, float>(faiss::METRIC_Jaccard, cur_query,
+                                                                                   (const uint8_t*)xb, 1, nb, radius,
+                                                                                   dim / 8, &res, id_selector);
                     break;
                 }
                 case faiss::METRIC_Hamming: {

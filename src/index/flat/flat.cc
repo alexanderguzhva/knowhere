@@ -16,12 +16,11 @@
 #include "faiss/index_io.h"
 #include "index/flat/flat_config.h"
 #include "io/memory_io.h"
-#include "knowhere/comp/thread_pool.h"
 #include "knowhere/bitsetview_idselector.h"
+#include "knowhere/comp/thread_pool.h"
 #include "knowhere/factory.h"
 #include "knowhere/log.h"
 #include "knowhere/utils.h"
-
 
 namespace knowhere {
 
@@ -114,7 +113,7 @@ class FlatIndexNode : public IndexNode {
                     }
                     if constexpr (std::is_same<T, faiss::IndexBinaryFlat>::value) {
                         auto cur_i_dis = reinterpret_cast<int32_t*>(cur_dis);
-                        
+
                         faiss::SearchParameters search_params;
                         search_params.sel = id_selector;
 
