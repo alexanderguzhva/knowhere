@@ -31,6 +31,9 @@ struct IndexIVFFlat : IndexIVF {
 
     void restore_codes(const uint8_t* raw_data, const size_t raw_size);
 
+    // Be careful with overriding this function, because
+    //   renormalized x may be used inside. 
+    // Overridden by IndexIVFFlatDedup.
     void train(idx_t n, const float* x) override;
 
     void add_with_ids(idx_t n, const float* x, const idx_t* xids) override;

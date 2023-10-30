@@ -61,7 +61,7 @@ IndexIVFPQFastScan::IndexIVFPQFastScan(
         MetricType metric,
         int bbs)
         : IndexIVFPQFastScan(quantizer, d, nlist, M, nbits_per_idx, metric, bbs) {
-    is_cosine_ = is_cosine;
+    this->is_cosine = is_cosine;
 }
 
 IndexIVFPQFastScan::IndexIVFPQFastScan() {
@@ -133,17 +133,6 @@ void IndexIVFPQFastScan::train_encoder(
     }
 }
 
-void IndexIVFPQFastScan::train(idx_t n, const float* x) {
-    if (is_cosine_) {
-        auto norm_data = std::make_unique<float[]>(n * d);
-        std::memcpy(norm_data.get(), x, n * d * sizeof(float));
-        knowhere::NormalizeVecs(norm_data.get(), n, d);
-        IndexIVFFastScan::train(n, norm_data.get());
-    } else {
-        IndexIVFFastScan::train(n, x);
-    }
-}
-
 idx_t IndexIVFPQFastScan::train_encoder_num_vectors() const {
     return pq.cp.max_points_per_centroid * pq.ksub;
 }
@@ -156,20 +145,6 @@ void IndexIVFPQFastScan::precompute_table() {
             precomputed_table,
             by_residual,
             verbose);
-}
-
-void IndexIVFPQFastScan::add_with_ids(
-        idx_t n,
-        const float* x,
-        const idx_t* xids) {
-    if (is_cosine_) {
-        auto norm_data = std::make_unique<float[]>(n * d);
-        std::memcpy(norm_data.get(), x, n * d * sizeof(float));
-        norms = std::move(knowhere::NormalizeVecs(norm_data.get(), n, d));
-        IndexIVFFastScan::add_with_ids(n, norm_data.get(), xids);
-    } else {
-        IndexIVFFastScan::add_with_ids(n, x, xids);
-    }
 }
 
 /*********************************************************

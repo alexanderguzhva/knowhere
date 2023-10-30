@@ -1212,8 +1212,8 @@ Index* read_index(IOReader* f, int io_flags) {
         READ1(ivpq->M2);
         READ1(ivpq->implem);
         READ1(ivpq->qbs2);
-        READ1(ivpq->is_cosine_);
-        if (ivpq->is_cosine_) {
+        READ1(ivpq->is_cosine);
+        if (ivpq->is_cosine) {
             READVECTOR(ivpq->norms);
         }
         read_ProductQuantizer(&ivpq->pq, f);

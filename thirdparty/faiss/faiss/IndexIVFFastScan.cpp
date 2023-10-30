@@ -43,11 +43,14 @@ IndexIVFFastScan::IndexIVFFastScan(
         size_t d,
         size_t nlist,
         size_t code_size,
-        MetricType metric)
+        MetricType metric,
+        bool is_cosine)
         : IndexIVF(quantizer, d, nlist, code_size, metric) {
     // unlike other indexes, we prefer no residuals for performance reasons.
     by_residual = false;
     FAISS_THROW_IF_NOT(metric == METRIC_L2 || metric == METRIC_INNER_PRODUCT);
+
+    this->is_cosine = is_cosine;
 }
 
 IndexIVFFastScan::IndexIVFFastScan() {
@@ -90,7 +93,33 @@ IndexIVFFastScan::~IndexIVFFastScan() = default;
  * Code management functions
  *********************************************************/
 
+void IndexIVFFastScan::train(idx_t n, const float* x) {
+    if (is_cosine) {
+        auto norm_data = std::make_unique<float[]>(n * d);
+        std::memcpy(norm_data.get(), x, n * d * sizeof(float));
+        knowhere::NormalizeVecs(norm_data.get(), n, d);
+        IndexIVF::train(n, norm_data.get());
+    } else {
+        IndexIVF::train(n, x);
+    }
+}
+
 void IndexIVFFastScan::add_with_ids(
+        idx_t n,
+        const float* x,
+        const idx_t* xids) {
+    if (is_cosine) {
+        auto norm_data = std::make_unique<float[]>(n * d);
+        std::memcpy(norm_data.get(), x, n * d * sizeof(float));
+        norms = std::move(knowhere::NormalizeVecs(norm_data.get(), n, d));
+        add_with_ids_impl(n, norm_data.get(), xids);
+    } else {
+        add_with_ids_impl(n, x, xids);
+    }
+}
+
+// knowhere-specific function
+void IndexIVFFastScan::add_with_ids_impl(
         idx_t n,
         const float* x,
         const idx_t* xids) {
@@ -118,7 +147,7 @@ void IndexIVFFastScan::add_with_ids(
                        total_time,
                        mem);
             }
-            add_with_ids(i1 - i0, x + i0 * d, xids ? xids + i0 : nullptr);
+            add_with_ids_impl(i1 - i0, x + i0 * d, xids ? xids + i0 : nullptr);
         }
         return;
     }

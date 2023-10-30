@@ -50,12 +50,16 @@ struct IndexIVFFastScan : IndexIVF {
     int qbs = 0;
     size_t qbs2 = 0;
 
+    // // todo aguzhva: get rid of this
+    std::vector<float> norms;
+
     IndexIVFFastScan(
             Index* quantizer,
             size_t d,
             size_t nlist,
             size_t code_size,
-            MetricType metric = METRIC_L2);
+            MetricType metric = METRIC_L2,
+            bool is_cosine = false);
 
     IndexIVFFastScan();
 
@@ -74,7 +78,18 @@ struct IndexIVFFastScan : IndexIVF {
     /// orig's inverted lists (for debugging)
     InvertedLists* orig_invlists = nullptr;
 
-    void add_with_ids(idx_t n, const float* x, const idx_t* xids) override;
+    // Knowhere-specific function, needed for norms, introduced in PR #1
+    // final is needed because 'x' can be renormalized inside it,
+    //   so a derived class is not allowed to override this function.
+    void add_with_ids(idx_t n, const float* x, const idx_t* xids) override final;
+
+    // This matches Faiss baseline.
+    void add_with_ids_impl(idx_t n, const float* x, const idx_t* xids);
+
+    // Knowhere-specific override.
+    // final is needed because 'x' can be renormalized inside it,
+    //   so a derived class is not allowed to override this function.
+    void train(idx_t n, const float* x) override final;
 
     // prepare look-up tables
 

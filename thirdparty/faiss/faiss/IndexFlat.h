@@ -24,6 +24,9 @@ struct IndexFlat : IndexFlatCodes {
     explicit IndexFlat(idx_t d, MetricType metric = METRIC_L2,
                        bool is_cosine = false);
 
+    // Be careful with overriding this function, because
+    //   renormalized x may be used inside. 
+    // Overridden by IndexFlat1D.
     void add(idx_t n, const float* x) override;
 
     void search(

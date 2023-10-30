@@ -170,7 +170,7 @@ void IndexScaNN::search(
 
     rf->compute_distance_subset(n, x, k_base, base_distances, base_labels);
 
-    if (base->is_cosine_) {
+    if (base->is_cosine) {
         for (idx_t i = 0; i < n * k_base; i++) {
             if (base_labels[i] >= 0) {
                 base_distances[i] /= base->norms[base_labels[i]];
@@ -234,7 +234,7 @@ void IndexScaNN::range_search(
 
     idx_t current = 0;
     for (idx_t i = 0; i < result->lims[1]; ++i) {
-        if (base->is_cosine_) {
+        if (base->is_cosine) {
             result->distances[i] /= base->norms[result->labels[i]];
         }
         if (metric_type == METRIC_L2) {
