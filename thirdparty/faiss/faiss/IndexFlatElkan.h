@@ -15,16 +15,23 @@
 
 namespace faiss {
 
-// This is a special modification of IndexFlat that uses
-//   elkan algorithm for the search. It is slower that the
-//   regular IndexFlat::search() implementation, but sometimes
-//   the trained index produces better recall rate.
+// This is a special modification of IndexFlat that does two things.
+// 1. It allows to use elkan algorithm for the search. It is slower, 
+//   sometimes a magnitude slower than the regular IndexFlat::search() 
+//   implementation, but sometimes the trained index produces a better 
+//   recall rate.
+// 2. It always uses L2 distance for the IP / L2 metrics in order to
+//   support an early stop strategy from Clustering.cpp. Early stop
+//   strategy is a Knowhere-specific feature.
+//
 // This index is intended to be used in Knowhere's ivf.cc file ONLY!!!
 //
 // Elkan algo was introduced into Knowhere in #2178, #2180 and #2258. 
 struct IndexFlatElkan : IndexFlat {
+    bool use_elkan = true;
+
     explicit IndexFlatElkan(idx_t d, MetricType metric = METRIC_L2,
-                       bool is_cosine = false);
+                       bool is_cosine = false, bool use_elkan = true);
 
     void search(
             idx_t n,

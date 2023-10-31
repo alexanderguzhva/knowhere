@@ -18,8 +18,10 @@
 
 namespace faiss {
 
-IndexFlatElkan::IndexFlatElkan(idx_t d, MetricType metric, bool is_cosine)
-        : IndexFlat(d, metric, is_cosine) {}
+IndexFlatElkan::IndexFlatElkan(idx_t d, MetricType metric, bool is_cosine, bool use_elkan)
+        : IndexFlat(d, metric, is_cosine) {
+    this->use_elkan = use_elkan;
+}
 
 void IndexFlatElkan::search(
         idx_t n,
@@ -50,7 +52,18 @@ void IndexFlatElkan::search(
         case METRIC_INNER_PRODUCT:
         case METRIC_L2: {
             // ignore the metric_type, both use L2
-            elkan_L2_sse(x, get_xb(), d, n, ntotal, labels, dis_inner);
+            if (use_elkan) {
+                // use elkan
+                elkan_L2_sse(x, get_xb(), d, n, ntotal, labels, dis_inner);
+            }
+            else {
+                // use L2 search. The same code as in IndexFlat::search() for L2.
+                IDSelector* sel = params ? params->sel : nullptr;
+
+                float_maxheap_array_t res = {size_t(n), size_t(k), labels, distances};
+                knn_L2sqr(x, get_xb(), d, n, ntotal, &res, nullptr, sel);
+            }
+
             break;
         }
         default: {

@@ -237,6 +237,7 @@ namespace {
 // turn IndexFlatElkan into IndexFlat
 std::unique_ptr<faiss::IndexFlat> to_index_flat(
     std::unique_ptr<faiss::IndexFlat>&& index) {
+    // C++ slicing here
     return std::make_unique<faiss::IndexFlat>(std::move(*index));
 }
 
@@ -283,18 +284,15 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             const bool use_elkan = ivf_flat_cfg.use_elkan.value_or(true);
 
             // create quantizer for the training
-            auto qzr = use_elkan ? 
-                std::make_unique<faiss::IndexFlatElkan>(dim, metric.value()) :
-                std::make_unique<faiss::IndexFlat>(dim, metric.value());
+            std::unique_ptr<faiss::IndexFlat> qzr = 
+                std::make_unique<faiss::IndexFlatElkan>(dim, metric.value(), false, use_elkan);
             // create index. Index does not own qzr
             index = std::make_unique<faiss::IndexIVFFlat>(qzr.get(), dim, nlist, metric.value(), is_cosine);
             // train
             index->train(rows, (const float*)data);
-            // replace quantizer if needed
-            if (use_elkan) {
-                qzr = to_index_flat(std::move(qzr));
-                index->quantizer = qzr.get();
-            }
+            // replace quantizer with a regular IndexFlat
+            qzr = to_index_flat(std::move(qzr));
+            index->quantizer = qzr.get();
             // transfer ownership of qzr to index
             qzr.release();
             index->own_fields = true;
@@ -306,19 +304,16 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             const bool use_elkan = ivf_flat_cc_cfg.use_elkan.value_or(true);
 
             // create quantizer for the training
-            auto qzr = use_elkan ? 
-                std::make_unique<faiss::IndexFlatElkan>(dim, metric.value()) :
-                std::make_unique<faiss::IndexFlat>(dim, metric.value());
+            std::unique_ptr<faiss::IndexFlat> qzr = 
+                std::make_unique<faiss::IndexFlatElkan>(dim, metric.value(), false, use_elkan);
             // create index. Index does not own qzr
             index = std::make_unique<faiss::IndexIVFFlatCC>(qzr.get(), dim, nlist, ivf_flat_cc_cfg.ssize.value(),
                                                             metric.value(), is_cosine);
             // train
             index->train(rows, (const float*)data);
-            // replace quantizer if needed
-            if (use_elkan) {
-                qzr = to_index_flat(std::move(qzr));
-                index->quantizer = qzr.get();
-            }
+            // replace quantizer with a regular IndexFlat
+            qzr = to_index_flat(std::move(qzr));
+            index->quantizer = qzr.get();
             // transfer ownership of qzr to index
             qzr.release();
             index->own_fields = true;
@@ -333,18 +328,15 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             const bool use_elkan = ivf_pq_cfg.use_elkan.value_or(true);
 
             // create quantizer for the training
-            auto qzr = use_elkan ? 
-                std::make_unique<faiss::IndexFlatElkan>(dim, metric.value()) :
-                std::make_unique<faiss::IndexFlat>(dim, metric.value());
+            std::unique_ptr<faiss::IndexFlat> qzr = 
+                std::make_unique<faiss::IndexFlatElkan>(dim, metric.value(), false, use_elkan);
             // create index. Index does not own qzr
             index = std::make_unique<faiss::IndexIVFPQ>(qzr.get(), dim, nlist, ivf_pq_cfg.m.value(), nbits, metric.value());
             // train
             index->train(rows, (const float*)data);
-            // replace quantizer if needed
-            if (use_elkan) {
-                qzr = to_index_flat(std::move(qzr));
-                index->quantizer = qzr.get();
-            }
+            // replace quantizer with a regular IndexFlat
+            qzr = to_index_flat(std::move(qzr));
+            index->quantizer = qzr.get();
             // transfer ownership of qzr to index
             qzr.release();
             index->own_fields = true;
@@ -357,9 +349,8 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             const bool use_elkan = scann_cfg.use_elkan.value_or(true);
 
             // create quantizer for the training
-            auto qzr = use_elkan ? 
-                std::make_unique<faiss::IndexFlatElkan>(dim, metric.value()) :
-                std::make_unique<faiss::IndexFlat>(dim, metric.value());
+            std::unique_ptr<faiss::IndexFlat> qzr =  
+                std::make_unique<faiss::IndexFlatElkan>(dim, metric.value(), false, use_elkan);
             // create base index. it does not own qzr
             auto base_index = new faiss::IndexIVFPQFastScan(qzr.get(), dim, nlist, (dim + 1) / 2, 4, is_cosine, metric.value());
             // create scann index, which owns base_index
@@ -370,12 +361,10 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             }
             // train
             index->train(rows, (const float*)data);
-            // at this moment, we still own qzr
-            // replace quantizer if needed
-            if (use_elkan) {
-                qzr = to_index_flat(std::move(qzr));
-                base_index->quantizer = qzr.get();
-            }
+            // at this moment, we still own qzr.
+            // replace quantizer with a regular IndexFlat
+            qzr = to_index_flat(std::move(qzr));
+            base_index->quantizer = qzr.get();
             // release qzr
             qzr.release();
             base_index->own_fields = true;
@@ -387,19 +376,16 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             const bool use_elkan = ivf_sq_cfg.use_elkan.value_or(true);
 
             // create quantizer for the training
-            auto qzr = use_elkan ? 
-                std::make_unique<faiss::IndexFlatElkan>(dim, metric.value()) :
-                std::make_unique<faiss::IndexFlat>(dim, metric.value());
+            std::unique_ptr<faiss::IndexFlat> qzr = 
+                std::make_unique<faiss::IndexFlatElkan>(dim, metric.value(), false, use_elkan);
             // create index. Index does not own qzr
             index = std::make_unique<faiss::IndexIVFScalarQuantizer>(
                 qzr.get(), dim, nlist, faiss::ScalarQuantizer::QuantizerType::QT_8bit, metric.value());
             // train
             index->train(rows, (const float*)data);
-            // replace quantizer if needed
-            if (use_elkan) {
-                qzr = to_index_flat(std::move(qzr));
-                index->quantizer = qzr.get();
-            }
+            // replace quantizer with a regular IndexFlat
+            qzr = to_index_flat(std::move(qzr));
+            index->quantizer = qzr.get();
             // transfer ownership of qzr to index
             qzr.release();
             index->own_fields = true;
