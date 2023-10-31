@@ -123,7 +123,26 @@ void accumulate_q_4step(
     constexpr int Q4 = (QBS >> 12) & 15;
     constexpr int SQ = Q1 + Q2 + Q3 + Q4;
 
-    for (int64_t j0 = 0; j0 < ntotal2; j0 += 32) {
+    for (int64_t j0 = 0; j0 < ntotal2; j0 += 32, codes += 32 * nsq / 2) {
+        res.set_block_origin(0, j0);
+
+        // skip computing distances if all vectors inside a block are filtered out
+        if (res.sel != nullptr) {  // we have filter here
+            bool skip_flag = true;
+            for (int64_t jj = 0; jj < std::min<int64_t>(32, ntotal2 - j0);
+                 jj++) {
+                auto real_idx = res.adjust_id(0, jj);
+                if (res.sel->is_member(real_idx)) {  // id is not filtered out, can not skip computing
+                    skip_flag = false;
+                    break;
+                }
+            }
+
+            if (skip_flag) {
+                continue;
+            }
+        }
+
         FixedStorageHandler<SQ, 2> res2;
         const uint8_t* LUT = LUT0;
         kernel_accumulate_block<Q1>(nsq, codes, LUT, res2, scaler);
@@ -142,9 +161,7 @@ void accumulate_q_4step(
             res2.set_block_origin(Q1 + Q2 + Q3, 0);
             kernel_accumulate_block<Q4>(nsq, codes, LUT, res2, scaler);
         }
-        res.set_block_origin(0, j0);
         res2.to_other_handler(res);
-        codes += 32 * nsq / 2;
     }
 }
 
