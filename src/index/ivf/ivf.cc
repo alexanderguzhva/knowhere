@@ -352,12 +352,14 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             std::unique_ptr<faiss::IndexFlat> qzr =  
                 std::make_unique<faiss::IndexFlatElkan>(dim, metric.value(), false, use_elkan);
             // create base index. it does not own qzr
-            auto base_index = new faiss::IndexIVFPQFastScan(qzr.get(), dim, nlist, (dim + 1) / 2, 4, is_cosine, metric.value());
-            // create scann index, which owns base_index
+            auto base_index = 
+                std::make_unique<faiss::IndexIVFPQFastScan>(qzr.get(), dim, nlist, (dim + 1) / 2, 4, is_cosine, metric.value());
+            // create scann index, which does not base_index by default,
+            //    but owns the refine index by default omg
             if (scann_cfg.with_raw_data.value()) {
-                index = std::make_unique<faiss::IndexScaNN>(base_index, (const float*)data);
+                index = std::make_unique<faiss::IndexScaNN>(base_index.get(), (const float*)data);
             } else {
-                index = std::make_unique<faiss::IndexScaNN>(base_index, nullptr);
+                index = std::make_unique<faiss::IndexScaNN>(base_index.get(), nullptr);
             }
             // train
             index->train(rows, (const float*)data);
@@ -368,6 +370,9 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             // release qzr
             qzr.release();
             base_index->own_fields = true;
+            // transfer ownership of the base index
+            base_index.release();
+            index->own_fields = true;
         }
         if constexpr (std::is_same<faiss::IndexIVFScalarQuantizer, T>::value) {
             const IvfSqConfig& ivf_sq_cfg = static_cast<const IvfSqConfig&>(cfg);
