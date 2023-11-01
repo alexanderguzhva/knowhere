@@ -398,7 +398,7 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
         if constexpr (std::is_same<faiss::IndexBinaryIVF, T>::value) {
             const IvfBinConfig& ivf_bin_cfg = static_cast<const IvfBinConfig&>(cfg);
             auto nlist = MatchNlist(rows, ivf_bin_cfg.nlist.value());
-            
+
             // create quantizer
             auto qzr = std::make_unique<faiss::IndexBinaryFlat>(dim, metric.value());
             // create index. Index does not own qzr
