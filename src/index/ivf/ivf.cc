@@ -235,13 +235,13 @@ MatchNbits(int64_t size, int64_t nbits) {
 namespace {
 
 // turn IndexFlatElkan into IndexFlat
-std::unique_ptr<faiss::IndexFlat> to_index_flat(
-    std::unique_ptr<faiss::IndexFlat>&& index) {
+std::unique_ptr<faiss::IndexFlat>
+to_index_flat(std::unique_ptr<faiss::IndexFlat>&& index) {
     // C++ slicing here
     return std::make_unique<faiss::IndexFlat>(std::move(*index));
 }
 
-}
+}  // namespace
 
 template <typename T>
 Status
@@ -331,7 +331,8 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             std::unique_ptr<faiss::IndexFlat> qzr =
                 std::make_unique<faiss::IndexFlatElkan>(dim, metric.value(), false, use_elkan);
             // create index. Index does not own qzr
-            index = std::make_unique<faiss::IndexIVFPQ>(qzr.get(), dim, nlist, ivf_pq_cfg.m.value(), nbits, metric.value());
+            index =
+                std::make_unique<faiss::IndexIVFPQ>(qzr.get(), dim, nlist, ivf_pq_cfg.m.value(), nbits, metric.value());
             // train
             index->train(rows, (const float*)data);
             // replace quantizer with a regular IndexFlat
@@ -352,8 +353,8 @@ IvfIndexNode<T>::Train(const DataSet& dataset, const Config& cfg) {
             std::unique_ptr<faiss::IndexFlat> qzr =
                 std::make_unique<faiss::IndexFlatElkan>(dim, metric.value(), false, use_elkan);
             // create base index. it does not own qzr
-            auto base_index =
-                std::make_unique<faiss::IndexIVFPQFastScan>(qzr.get(), dim, nlist, (dim + 1) / 2, 4, is_cosine, metric.value());
+            auto base_index = std::make_unique<faiss::IndexIVFPQFastScan>(qzr.get(), dim, nlist, (dim + 1) / 2, 4,
+                                                                          is_cosine, metric.value());
             // create scann index, which does not base_index by default,
             //    but owns the refine index by default omg
             if (scann_cfg.with_raw_data.value()) {
