@@ -128,7 +128,7 @@ IndexIVFAdditiveQuantizerFastScan::IndexIVFAdditiveQuantizerFastScan() {
 }
 
 IndexIVFAdditiveQuantizerFastScan::~IndexIVFAdditiveQuantizerFastScan() =
-    default;
+        default;
 
 /*********************************************************
  * Training
@@ -307,7 +307,9 @@ void IndexIVFAdditiveQuantizerFastScan::search(
     const IVFSearchParameters* params = nullptr;
     if (params_in) {
         params = dynamic_cast<const IVFSearchParameters*>(params_in);
-        FAISS_THROW_IF_NOT_MSG(params, "IndexIVFAdditiveQuantizerFastScan params have incorrect type");
+        FAISS_THROW_IF_NOT_MSG(
+                params,
+                "IndexIVFAdditiveQuantizerFastScan params have incorrect type");
     }
 
     FAISS_THROW_IF_NOT(k > 0);
@@ -319,9 +321,11 @@ void IndexIVFAdditiveQuantizerFastScan::search(
 
     NormTableScaler scaler(norm_scale);
     if (metric_type == METRIC_L2) {
-        search_dispatch_implem<true>(n, x, k, distances, labels, scaler, params);
+        search_dispatch_implem<true>(
+                n, x, k, distances, labels, scaler, params);
     } else {
-        search_dispatch_implem<false>(n, x, k, distances, labels, scaler, params);
+        search_dispatch_implem<false>(
+                n, x, k, distances, labels, scaler, params);
     }
 }
 
