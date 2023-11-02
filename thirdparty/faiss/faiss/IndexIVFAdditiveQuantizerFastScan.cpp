@@ -303,22 +303,27 @@ void IndexIVFAdditiveQuantizerFastScan::search(
         idx_t k,
         float* distances,
         idx_t* labels,
-        const SearchParameters* params) const {
-    FAISS_THROW_IF_NOT_MSG(
-            !params, "search params not supported for this index");
+        const SearchParameters* params_in) const {
+    // FAISS_THROW_IF_NOT_MSG(
+    //         !params, "search params not supported for this index");
+    const IVFSearchParameters* params = nullptr;
+    if (params_in) {
+        params = dynamic_cast<const IVFSearchParameters*>(params_in);
+        FAISS_THROW_IF_NOT_MSG(params, "IndexIVFAdditiveQuantizerFastScan params have incorrect type");
+    }
 
     FAISS_THROW_IF_NOT(k > 0);
     bool rescale = (rescale_norm && norm_scale > 1 && metric_type == METRIC_L2);
     if (!rescale) {
-        IndexIVFFastScan::search(n, x, k, distances, labels);
+        IndexIVFFastScan::search(n, x, k, distances, labels, params);
         return;
     }
 
     NormTableScaler scaler(norm_scale);
     if (metric_type == METRIC_L2) {
-        search_dispatch_implem<true>(n, x, k, distances, labels, scaler);
+        search_dispatch_implem<true>(n, x, k, distances, labels, scaler, params);
     } else {
-        search_dispatch_implem<false>(n, x, k, distances, labels, scaler);
+        search_dispatch_implem<false>(n, x, k, distances, labels, scaler, params);
     }
 }
 
