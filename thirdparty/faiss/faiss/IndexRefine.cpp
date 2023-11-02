@@ -160,7 +160,7 @@ void IndexRefine::search(
                     base_distances[j + i * k_base] = dis;
                 };
 
-            distance_compute_by_idx_if(base_labels, k_base, dc.get(), filter, apply);
+            distance_compute_by_idx_if(base_labels + i * k_base, k_base, dc.get(), filter, apply);
         }
     }
 
