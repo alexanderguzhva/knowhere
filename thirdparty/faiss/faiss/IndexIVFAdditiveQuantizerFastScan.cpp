@@ -304,8 +304,6 @@ void IndexIVFAdditiveQuantizerFastScan::search(
         float* distances,
         idx_t* labels,
         const SearchParameters* params_in) const {
-    // FAISS_THROW_IF_NOT_MSG(
-    //         !params, "search params not supported for this index");
     const IVFSearchParameters* params = nullptr;
     if (params_in) {
         params = dynamic_cast<const IVFSearchParameters*>(params_in);
