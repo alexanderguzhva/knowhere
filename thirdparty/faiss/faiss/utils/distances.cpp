@@ -63,7 +63,7 @@ void fvec_norms_L2(
         const float* __restrict x,
         size_t d,
         size_t nx) {
-#pragma omp parallel for
+#pragma omp parallel for if (nx > 10000)
     for (int64_t i = 0; i < nx; i++) {
         nr[i] = sqrtf(fvec_norm_L2sqr(x + i * d, d));
     }
@@ -74,24 +74,52 @@ void fvec_norms_L2sqr(
         const float* __restrict x,
         size_t d,
         size_t nx) {
-#pragma omp parallel for
+#pragma omp parallel for if (nx > 10000)
     for (int64_t i = 0; i < nx; i++)
         nr[i] = fvec_norm_L2sqr(x + i * d, d);
 }
 
-void fvec_renorm_L2(size_t d, size_t nx, float* __restrict x) {
-#pragma omp parallel for
+// The following is a workaround to a problem
+// in OpenMP in fbcode. The crash occurs
+// inside OMP when IndexIVFSpectralHash::set_query()
+// calls fvec_renorm_L2. set_query() is always
+// calling this function with nx == 1, so even
+// the omp version should run single threaded,
+// as per the if condition of the omp pragma.
+// Instead, the omp version crashes inside OMP.
+// The workaround below is explicitly branching
+// off to a codepath without omp.
+
+#define FVEC_RENORM_L2_IMPL                   \
+    float* __restrict xi = x + i * d;         \
+                                              \
+    float nr = fvec_norm_L2sqr(xi, d);        \
+                                              \
+    if (nr > 0) {                             \
+        size_t j;                             \
+        const float inv_nr = 1.0 / sqrtf(nr); \
+        for (j = 0; j < d; j++)               \
+            xi[j] *= inv_nr;                  \
+    }
+
+void fvec_renorm_L2_noomp(size_t d, size_t nx, float* __restrict x) {
     for (int64_t i = 0; i < nx; i++) {
-        float* __restrict xi = x + i * d;
+        FVEC_RENORM_L2_IMPL
+    }
+}
 
-        float nr = fvec_norm_L2sqr(xi, d);
+void fvec_renorm_L2_omp(size_t d, size_t nx, float* __restrict x) {
+#pragma omp parallel for if (nx > 10000)
+    for (int64_t i = 0; i < nx; i++) {
+        FVEC_RENORM_L2_IMPL
+    }
+}
 
-        if (nr > 0) {
-            size_t j;
-            const float inv_nr = 1.0 / sqrtf(nr);
-            for (j = 0; j < d; j++)
-                xi[j] *= inv_nr;
-        }
+void fvec_renorm_L2(size_t d, size_t nx, float* __restrict x) {
+    if (nx <= 10000) {
+        fvec_renorm_L2_noomp(d, nx, x);
+    } else {
+        fvec_renorm_L2_omp(d, nx, x);
     }
 }
 
@@ -634,13 +662,13 @@ static void knn_jaccard_blas(
     /* block sizes */
     const size_t bs_x = 4096, bs_y = 1024;
     // const size_t bs_x = 16, bs_y = 16;
-    float* ip_block = new float[bs_x * bs_y];
-    float* x_norms = new float[nx];
-    float* y_norms = new float[ny];
-    ScopeDeleter<float> del1(ip_block), del3(x_norms), del2(y_norms);
 
-    fvec_norms_L2sqr(x_norms, x, d, nx);
-    fvec_norms_L2sqr(y_norms, y, d, ny);
+    std::unique_ptr<float[]> ip_block(new float[bs_x * bs_y]);
+    std::unique_ptr<float[]> x_norms(new float[nx]);
+    std::unique_ptr<float[]> y_norms(new float[ny]);
+
+    fvec_norms_L2sqr(x_norms.get(), x, d, nx);
+    fvec_norms_L2sqr(y_norms.get(), y, d, ny);
 
     for (size_t i0 = 0; i0 < nx; i0 += bs_x) {
         size_t i1 = i0 + bs_x;
@@ -668,14 +696,14 @@ static void knn_jaccard_blas(
                        x + i0 * d,
                        &di,
                        &zero,
-                       ip_block,
+                       ip_block.get(),
                        &nyi);
             }
 
             /* collect minima */
 #pragma omp parallel for
             for (size_t i = i0; i < i1; i++) {
-                float* ip_line = ip_block + (i - i0) * (j1 - j0);
+                float* ip_line = ip_block.get() + (i - i0) * (j1 - j0);
 
                 for (size_t j = j0; j < j1; j++) {
                     if (!sel || sel->is_member(j)) {
@@ -693,7 +721,7 @@ static void knn_jaccard_blas(
                     ip_line++;
                 }
             }
-            res.add_results(j0, j1, ip_block);
+            res.add_results(j0, j1, ip_block.get());
         }
         res.end_multiple();
         InterruptCallback::check();

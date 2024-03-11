@@ -225,6 +225,7 @@ struct IVFScanner : InvertedListScanner {
         this->store_pairs = store_pairs;
         this->sel = sel;
         this->code_size = index->code_size;
+        this->keep_max = is_similarity_metric(index->metric_type);
     }
 
     void set_query(const float* query) override {

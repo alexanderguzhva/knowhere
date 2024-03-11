@@ -121,6 +121,18 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t* labels,
             const SearchParameters* params = nullptr) const override;
 
+    void search_preassigned(
+            idx_t n,
+            const float* x,
+            idx_t k,
+            const idx_t* assign,
+            const float* centroid_dis,
+            float* distances,
+            idx_t* labels,
+            bool store_pairs,
+            const IVFSearchParameters* params = nullptr,
+            IndexIVFStats* stats = nullptr) const override;
+
     // range_search implementation was introduced in Knowhere,
     //   diff 73f03354568b4bf5a370df6f37e8d56dfc3a9c85
     void range_search(
@@ -139,6 +151,8 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t k,
             float* distances,
             idx_t* labels,
+            const idx_t* coarse_ids,
+            const float* coarse_dis,
             const Scaler& scaler,
             const IVFSearchParameters* params = nullptr) const;
 
@@ -158,6 +172,8 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t k,
             float* distances,
             idx_t* labels,
+            const idx_t* coarse_ids,
+            const float* coarse_dis,
             const Scaler& scaler,
             const IVFSearchParameters* params = nullptr) const;
 
@@ -168,6 +184,8 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t k,
             float* distances,
             idx_t* labels,
+            const idx_t* coarse_ids,
+            const float* coarse_dis,
             const Scaler& scaler,
             const IVFSearchParameters* params = nullptr) const;
 
@@ -180,6 +198,8 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t k,
             float* distances,
             idx_t* labels,
+            const idx_t* coarse_ids,
+            const float* coarse_dis,
             int impl,
             size_t* ndis_out,
             size_t* nlist_out,
@@ -193,6 +213,8 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t k,
             float* distances,
             idx_t* labels,
+            const idx_t* coarse_ids,
+            const float* coarse_dis,
             int impl,
             size_t* ndis_out,
             size_t* nlist_out,
@@ -219,6 +241,8 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t k,
             float* distances,
             idx_t* labels,
+            const idx_t* coarse_ids,
+            const float* coarse_dis,
             int impl,
             const Scaler& scaler,
             const IVFSearchParameters* params = nullptr) const;

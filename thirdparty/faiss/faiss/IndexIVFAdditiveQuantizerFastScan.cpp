@@ -322,10 +322,10 @@ void IndexIVFAdditiveQuantizerFastScan::search(
     NormTableScaler scaler(norm_scale);
     if (metric_type == METRIC_L2) {
         search_dispatch_implem<true>(
-                n, x, k, distances, labels, scaler, params);
+                n, x, k, distances, labels, nullptr, nullptr, scaler, params);
     } else {
         search_dispatch_implem<false>(
-                n, x, k, distances, labels, scaler, params);
+                n, x, k, distances, labels, nullptr, nullptr, scaler, params);
     }
 }
 

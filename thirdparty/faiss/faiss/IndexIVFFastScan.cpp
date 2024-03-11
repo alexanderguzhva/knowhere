@@ -111,7 +111,7 @@ void IndexIVFFastScan::add_with_ids(
     if (is_cosine) {
         auto norm_data = std::make_unique<float[]>(n * d);
         std::memcpy(norm_data.get(), x, n * d * sizeof(float));
-        norms = std::move(knowhere::NormalizeVecs(norm_data.get(), n, d));
+        norms = knowhere::NormalizeVecs(norm_data.get(), n, d);
         add_with_ids_impl(n, norm_data.get(), xids);
     } else {
         add_with_ids_impl(n, x, xids);
@@ -352,10 +352,43 @@ void IndexIVFFastScan::search(
     DummyScaler scaler;
     if (metric_type == METRIC_L2) {
         search_dispatch_implem<true>(
-                n, x, k, distances, labels, scaler, params);
+                n, x, k, distances, labels, nullptr, nullptr, scaler, params);
     } else {
         search_dispatch_implem<false>(
-                n, x, k, distances, labels, scaler, params);
+                n, x, k, distances, labels, nullptr, nullptr, scaler, params);
+    }
+}
+
+void IndexIVFFastScan::search_preassigned(
+        idx_t n,
+        const float* x,
+        idx_t k,
+        const idx_t* assign,
+        const float* centroid_dis,
+        float* distances,
+        idx_t* labels,
+        bool store_pairs,
+        const IVFSearchParameters* params_in,
+        IndexIVFStats* stats) const {
+    const IVFSearchParameters* params = nullptr;
+    if (params_in) {
+        params = dynamic_cast<const IVFSearchParameters*>(params_in);
+        FAISS_THROW_IF_NOT_MSG(
+                params, "IndexIVFFastScan params have incorrect type");
+    }
+
+    FAISS_THROW_IF_NOT_MSG(
+            !store_pairs, "store_pairs not supported for this index");
+    FAISS_THROW_IF_NOT_MSG(!stats, "stats not supported for this index");
+    FAISS_THROW_IF_NOT(k > 0);
+
+    DummyScaler scaler;
+    if (metric_type == METRIC_L2) {
+        search_dispatch_implem<true>(
+                n, x, k, distances, labels, assign, centroid_dis, scaler, params);
+    } else {
+        search_dispatch_implem<false>(
+                n, x, k, distances, labels, assign, centroid_dis, scaler, params);
     }
 }
 
@@ -389,6 +422,8 @@ void IndexIVFFastScan::search_dispatch_implem(
         idx_t k,
         float* distances,
         idx_t* labels,
+        const idx_t* coarse_ids,
+        const float* coarse_dis,
         const Scaler& scaler,
         const IVFSearchParameters* params) const {
     const idx_t nprobe = params ? params->nprobe : this->nprobe;
@@ -422,9 +457,9 @@ void IndexIVFFastScan::search_dispatch_implem(
     }
 
     if (impl == 1) {
-        search_implem_1<Cfloat>(n, x, k, distances, labels, scaler, params);
+        search_implem_1<Cfloat>(n, x, k, distances, labels, coarse_ids, coarse_dis, scaler, params);
     } else if (impl == 2) {
-        search_implem_2<C>(n, x, k, distances, labels, scaler, params);
+        search_implem_2<C>(n, x, k, distances, labels, coarse_ids, coarse_dis, scaler, params);
 
     } else if (impl >= 10 && impl <= 15) {
         size_t ndis = 0, nlist_visited = 0;
@@ -437,6 +472,8 @@ void IndexIVFFastScan::search_dispatch_implem(
                         k,
                         distances,
                         labels,
+                        coarse_ids, 
+                        coarse_dis,
                         impl,
                         &ndis,
                         &nlist_visited,
@@ -444,7 +481,16 @@ void IndexIVFFastScan::search_dispatch_implem(
                         params);
             } else if (impl == 14 || impl == 15) {
                 search_implem_14<C>(
-                        n, x, k, distances, labels, impl, scaler, params);
+                        n, 
+                        x, 
+                        k, 
+                        distances, 
+                        labels, 
+                        coarse_ids, 
+                        coarse_dis,
+                        impl, 
+                        scaler, 
+                        params);
             } else {
                 search_implem_10<C>(
                         n,
@@ -452,6 +498,8 @@ void IndexIVFFastScan::search_dispatch_implem(
                         k,
                         distances,
                         labels,
+                        coarse_ids, 
+                        coarse_dis,
                         impl,
                         &ndis,
                         &nlist_visited,
@@ -483,7 +531,16 @@ void IndexIVFFastScan::search_dispatch_implem(
                 impl == 15) { // this might require slicing if there are too
                               // many queries (for now we keep this simple)
                 search_implem_14<C>(
-                        n, x, k, distances, labels, impl, scaler, params);
+                        n, 
+                        x, 
+                        k, 
+                        distances, 
+                        labels, 
+                        coarse_ids, 
+                        coarse_dis,
+                        impl, 
+                        scaler, 
+                        params);
             } else {
 #pragma omp parallel for reduction(+ : ndis, nlist_visited)
                 for (int slice = 0; slice < nslice; slice++) {
@@ -491,6 +548,12 @@ void IndexIVFFastScan::search_dispatch_implem(
                     idx_t i1 = n * (slice + 1) / nslice;
                     float* dis_i = distances + i0 * k;
                     idx_t* lab_i = labels + i0 * k;
+                    const idx_t* coarse_ids_i = coarse_ids != nullptr
+                            ? coarse_ids + i0 * nprobe
+                            : nullptr;
+                    const float* coarse_dis_i = coarse_dis != nullptr
+                            ? coarse_dis + i0 * nprobe
+                            : nullptr;
                     if (impl == 12 || impl == 13) {
                         search_implem_12<C>(
                                 i1 - i0,
@@ -498,6 +561,8 @@ void IndexIVFFastScan::search_dispatch_implem(
                                 k,
                                 dis_i,
                                 lab_i,
+                                coarse_ids_i, 
+                                coarse_dis_i,
                                 impl,
                                 &ndis,
                                 &nlist_visited,
@@ -510,6 +575,8 @@ void IndexIVFFastScan::search_dispatch_implem(
                                 k,
                                 dis_i,
                                 lab_i,
+                                coarse_ids_i, 
+                                coarse_dis_i,
                                 impl,
                                 &ndis,
                                 &nlist_visited,
@@ -527,6 +594,23 @@ void IndexIVFFastScan::search_dispatch_implem(
     }
 }
 
+#define COARSE_QUANTIZE                                   \
+    std::unique_ptr<idx_t[]> coarse_ids_buffer;           \
+    std::unique_ptr<float[]> coarse_dis_buffer;           \
+    if (coarse_ids == nullptr || coarse_dis == nullptr) { \
+        coarse_ids_buffer.reset(new idx_t[n * nprobe]);   \
+        coarse_dis_buffer.reset(new float[n * nprobe]);   \
+        quantizer->search(                                \
+                n,                                        \
+                x,                                        \
+                nprobe,                                   \
+                coarse_dis_buffer.get(),                  \
+                coarse_ids_buffer.get(),                  \
+                quantizer_params);                        \
+        coarse_ids = coarse_ids_buffer.get();             \
+        coarse_dis = coarse_dis_buffer.get();             \
+    }
+
 template <class C, class Scaler>
 void IndexIVFFastScan::search_implem_1(
         idx_t n,
@@ -534,6 +618,8 @@ void IndexIVFFastScan::search_implem_1(
         idx_t k,
         float* distances,
         idx_t* labels,
+        const idx_t* coarse_ids,
+        const float* coarse_dis,
         const Scaler& scaler,
         const IVFSearchParameters* params) const {
     FAISS_THROW_IF_NOT(orig_invlists);
@@ -544,17 +630,13 @@ void IndexIVFFastScan::search_implem_1(
     const SearchParameters* quantizer_params =
             params ? params->quantizer_params : nullptr;
 
-    std::unique_ptr<idx_t[]> coarse_ids(new idx_t[n * nprobe]);
-    std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
-
-    quantizer->search(
-            n, x, nprobe, coarse_dis.get(), coarse_ids.get(), quantizer_params);
+    COARSE_QUANTIZE;
 
     size_t dim12 = ksub * M;
     AlignedTable<float> dis_tables;
     AlignedTable<float> biases;
 
-    compute_LUT(n, x, coarse_ids.get(), coarse_dis.get(), dis_tables, biases);
+    compute_LUT(n, x, coarse_ids, coarse_dis, dis_tables, biases);
 
     bool single_LUT = !lookup_table_is_3d();
 
@@ -613,6 +695,8 @@ void IndexIVFFastScan::search_implem_2(
         idx_t k,
         float* distances,
         idx_t* labels,
+        const idx_t* coarse_ids,
+        const float* coarse_dis,
         const Scaler& scaler,
         const IVFSearchParameters* params) const {
     FAISS_THROW_IF_NOT(orig_invlists);
@@ -623,11 +707,7 @@ void IndexIVFFastScan::search_implem_2(
     const SearchParameters* quantizer_params =
             params ? params->quantizer_params : nullptr;
 
-    std::unique_ptr<idx_t[]> coarse_ids(new idx_t[n * nprobe]);
-    std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
-
-    quantizer->search(
-            n, x, nprobe, coarse_dis.get(), coarse_ids.get(), quantizer_params);
+    COARSE_QUANTIZE;
 
     size_t dim12 = ksub * M2;
     AlignedTable<uint8_t> dis_tables;
@@ -637,8 +717,8 @@ void IndexIVFFastScan::search_implem_2(
     compute_LUT_uint8(
             n,
             x,
-            coarse_ids.get(),
-            coarse_dis.get(),
+            coarse_ids,
+            coarse_dis,
             dis_tables,
             biases,
             normalizers.get());
@@ -714,6 +794,8 @@ void IndexIVFFastScan::search_implem_10(
         idx_t k,
         float* distances,
         idx_t* labels,
+        const idx_t* coarse_ids,
+        const float* coarse_dis,
         int impl,
         size_t* ndis_out,
         size_t* nlist_out,
@@ -732,17 +814,13 @@ void IndexIVFFastScan::search_implem_10(
     using ReservoirHC = ReservoirHandler<C, true>;
     using SingleResultHC = SingleResultHandler<C, true>;
 
-    std::unique_ptr<idx_t[]> coarse_ids(new idx_t[n * nprobe]);
-    std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
-
     uint64_t times[10];
     memset(times, 0, sizeof(times));
     int ti = 0;
 #define TIC times[ti++] = get_cy()
     TIC;
 
-    quantizer->search(
-            n, x, nprobe, coarse_dis.get(), coarse_ids.get(), quantizer_params);
+    COARSE_QUANTIZE;
 
     TIC;
 
@@ -754,8 +832,8 @@ void IndexIVFFastScan::search_implem_10(
     compute_LUT_uint8(
             n,
             x,
-            coarse_ids.get(),
-            coarse_dis.get(),
+            coarse_ids,
+            coarse_dis,
             dis_tables,
             biases,
             normalizers.get());
@@ -843,6 +921,8 @@ void IndexIVFFastScan::search_implem_12(
         idx_t k,
         float* distances,
         idx_t* labels,
+        const idx_t* coarse_ids,
+        const float* coarse_dis,
         int impl,
         size_t* ndis_out,
         size_t* nlist_out,
@@ -859,17 +939,13 @@ void IndexIVFFastScan::search_implem_12(
     const SearchParameters* quantizer_params =
             params ? params->quantizer_params : nullptr;
 
-    std::unique_ptr<idx_t[]> coarse_ids(new idx_t[n * nprobe]);
-    std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
-
     uint64_t times[10];
     memset(times, 0, sizeof(times));
     int ti = 0;
 #define TIC times[ti++] = get_cy()
     TIC;
 
-    quantizer->search(
-            n, x, nprobe, coarse_dis.get(), coarse_ids.get(), quantizer_params);
+    COARSE_QUANTIZE;
 
     TIC;
 
@@ -881,8 +957,8 @@ void IndexIVFFastScan::search_implem_12(
     compute_LUT_uint8(
             n,
             x,
-            coarse_ids.get(),
-            coarse_dis.get(),
+            coarse_ids,
+            coarse_dis,
             dis_tables,
             biases,
             normalizers.get());
@@ -1048,6 +1124,8 @@ void IndexIVFFastScan::search_implem_14(
         idx_t k,
         float* distances,
         idx_t* labels,
+        const idx_t* coarse_ids,
+        const float* coarse_dis,
         int impl,
         const Scaler& scaler,
         const IVFSearchParameters* params) const {
@@ -1062,13 +1140,9 @@ void IndexIVFFastScan::search_implem_14(
     const SearchParameters* quantizer_params =
             params ? params->quantizer_params : nullptr;
 
-    std::unique_ptr<idx_t[]> coarse_ids(new idx_t[n * nprobe]);
-    std::unique_ptr<float[]> coarse_dis(new float[n * nprobe]);
-
     uint64_t ttg0 = get_cy();
 
-    quantizer->search(
-            n, x, nprobe, coarse_dis.get(), coarse_ids.get(), quantizer_params);
+    COARSE_QUANTIZE;
 
     uint64_t ttg1 = get_cy();
     uint64_t coarse_search_tt = ttg1 - ttg0;
@@ -1081,8 +1155,8 @@ void IndexIVFFastScan::search_implem_14(
     compute_LUT_uint8(
             n,
             x,
-            coarse_ids.get(),
-            coarse_dis.get(),
+            coarse_ids,
+            coarse_dis,
             dis_tables,
             biases,
             normalizers.get());
@@ -1604,6 +1678,8 @@ template void IndexIVFFastScan::search_dispatch_implem<true, NormTableScaler>(
         idx_t k,
         float* distances,
         idx_t* labels,
+        const idx_t* coarse_ids,
+        const float* coarse_dis,
         const NormTableScaler& scaler,
         const IVFSearchParameters* params = nullptr) const;
 
@@ -1613,6 +1689,8 @@ template void IndexIVFFastScan::search_dispatch_implem<false, NormTableScaler>(
         idx_t k,
         float* distances,
         idx_t* labels,
+        const idx_t* coarse_ids,
+        const float* coarse_dis,
         const NormTableScaler& scaler,
         const IVFSearchParameters* params = nullptr) const;
 

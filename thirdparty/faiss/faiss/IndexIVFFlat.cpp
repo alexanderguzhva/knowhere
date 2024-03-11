@@ -260,7 +260,9 @@ struct IVFFlatScanner : InvertedListScanner {
     size_t d;
 
     IVFFlatScanner(size_t d, bool store_pairs, const IDSelector* sel)
-            : InvertedListScanner(store_pairs, sel), d(d) {}
+            : InvertedListScanner(store_pairs, sel), d(d) {
+        keep_max = is_similarity_metric(metric);
+    }
 
     const float* xi;
     void set_query(const float* query) override {
@@ -631,9 +633,9 @@ std::optional<std::pair<float, idx_t>> IndexIVFFlat::getIteratorNext(
                 IDSelector* sel = workspace->search_params
                         ? workspace->search_params->sel
                         : nullptr;
-                InvertedListScanner* scanner = get_InvertedListScanner(false, sel);
+                std::unique_ptr<InvertedListScanner> scanner(
+                    get_InvertedListScanner(false, sel));
                 scanner->set_query(workspace->query_data);
-                ScopeDeleter1<InvertedListScanner> del(scanner);
 
                 size_t segment_num = invlists->get_segment_num(list_no);
                 size_t scan_cnt = 0;

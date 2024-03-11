@@ -463,9 +463,8 @@ void IndexIVF::search_preassigned(
 
 #pragma omp parallel if (do_parallel) reduction(+ : nlistv, ndis, nheap)
     {
-        InvertedListScanner* scanner =
-                get_InvertedListScanner(store_pairs, sel);
-        ScopeDeleter1<InvertedListScanner> del(scanner);
+        std::unique_ptr<InvertedListScanner> scanner(
+                get_InvertedListScanner(store_pairs, sel));
 
         /*****************************************************
          * Depending on parallel_mode, there are two possible ways
@@ -936,7 +935,7 @@ void IndexIVF::range_search_preassigned(
 InvertedListScanner* IndexIVF::get_InvertedListScanner(
         bool /*store_pairs*/,
         const IDSelector* /* sel */) const {
-    return nullptr;
+    FAISS_THROW_MSG("get_InvertedListScanner not implemented");
 }
 
 void IndexIVF::reconstruct(idx_t key, float* recons) const {

@@ -580,7 +580,7 @@ ProductQuantizer* read_ProductQuantizer(const char* fname) {
 
 ProductQuantizer* read_ProductQuantizer(IOReader* reader) {
     ProductQuantizer* pq = new ProductQuantizer();
-    ScopeDeleter1<ProductQuantizer> del(pq);
+    std::unique_ptr<ProductQuantizer> del(pq);
 
     read_ProductQuantizer(pq, reader);
     del.release();
