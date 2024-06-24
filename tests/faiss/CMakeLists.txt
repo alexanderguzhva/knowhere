@@ -26,6 +26,7 @@ set(FAISS_TEST_SRCS
   ../../thirdparty/faiss/tests/test_fastscan_perf.cpp
   ../../thirdparty/faiss/tests/test_ivf_index.cpp
   ../../thirdparty/faiss/tests/test_disable_pq_sdc_tables.cpp
+  ../../thirdparty/faiss/tests/test_common_ivf_empty_index.cpp
   )
 
 find_package(GTest REQUIRED)
