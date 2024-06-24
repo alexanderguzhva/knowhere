@@ -168,6 +168,7 @@ void pairwise_extra_distances(
         HANDLE_VAR(JensenShannon);
         HANDLE_VAR(Lp);
         HANDLE_VAR(Jaccard);
+        HANDLE_VAR(NaNEuclidean);
 #undef HANDLE_VAR
         default:
             FAISS_THROW_MSG("metric type not implemented");
@@ -200,6 +201,7 @@ void knn_extra_metrics(
         HANDLE_VAR(JensenShannon);
         HANDLE_VAR(Lp);
         HANDLE_VAR(Jaccard);
+        HANDLE_VAR(NaNEuclidean);
 #undef HANDLE_VAR
         default:
             FAISS_THROW_MSG("metric type not implemented");
@@ -249,6 +251,7 @@ FlatCodesDistanceComputer* get_extra_distance_computer(
         HANDLE_VAR(JensenShannon);
         HANDLE_VAR(Lp);
         HANDLE_VAR(Jaccard);
+        HANDLE_VAR(NaNEuclidean);
 #undef HANDLE_VAR
         default:
             FAISS_THROW_MSG("metric type not implemented");

@@ -39,6 +39,7 @@ enum MetricType {
     METRIC_Canberra = 20,
     METRIC_BrayCurtis = 21,
     METRIC_JensenShannon = 22,
+    METRIC_NaNEuclidean = 24
 };
 
 /// all vector indices are this type
