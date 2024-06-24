@@ -206,13 +206,48 @@ struct Quantizer8bitDirect_neon<8> : public Quantizer8bitDirect<1> {
 
     FAISS_ALWAYS_INLINE float32x4x2_t
     reconstruct_8_components(const uint8_t* code, int i) const {
-        float32_t result[8] = {};
-        for (size_t j = 0; j < 8; j++) {
-            result[j] = code[i + j];
-        }
-        float32x4_t res1 = vld1q_f32(result);
-        float32x4_t res2 = vld1q_f32(result + 4);
-        return {res1, res2};
+        uint8x8_t x8 = vld1_u8((const uint8_t*)(code + i));
+        uint16x8_t y8 = vmovl_u8(x8);
+        uint16x4_t y8_0 = vget_low_u16(y8);
+        uint16x4_t y8_1 = vget_high_u16(y8);
+
+        // convert uint16 -> uint32 -> fp32
+        return {vcvtq_f32_u32(vmovl_u16(y8_0)), vcvtq_f32_u32(vmovl_u16(y8_1))};
+    }
+};
+
+/*******************************************************************
+ * 8bit_direct_signed quantizer
+ *******************************************************************/
+
+template <int SIMDWIDTH>
+struct Quantizer8bitDirectSigned_neon {};
+
+template <>
+struct Quantizer8bitDirectSigned_neon<1> : public Quantizer8bitDirectSigned<1> {
+    Quantizer8bitDirectSigned_neon(size_t d, const std::vector<float>& unused)
+            : Quantizer8bitDirectSigned(d, unused) {}
+};
+
+template <>
+struct Quantizer8bitDirectSigned_neon<8> : public Quantizer8bitDirectSigned<1> {
+    Quantizer8bitDirectSigned_neon(size_t d, const std::vector<float>& trained)
+            : Quantizer8bitDirectSigned<1>(d, trained) {}
+
+    FAISS_ALWAYS_INLINE float32x4x2_t
+    reconstruct_8_components(const uint8_t* code, int i) const {
+        uint8x8_t x8 = vld1_u8((const uint8_t*)(code + i));
+        uint16x8_t y8 = vmovl_u8(x8); // convert uint8 -> uint16
+        uint16x4_t y8_0 = vget_low_u16(y8);
+        uint16x4_t y8_1 = vget_high_u16(y8);
+
+        float32x4_t z8_0 = vcvtq_f32_u32(
+                vmovl_u16(y8_0)); // convert uint16 -> uint32 -> fp32
+        float32x4_t z8_1 = vcvtq_f32_u32(vmovl_u16(y8_1));
+
+        // subtract 128 to convert into signed numbers
+        return {vsubq_f32(z8_0, vmovq_n_f32(128.0)),
+                vsubq_f32(z8_1, vmovq_n_f32(128.0))};
     }
 };
 
@@ -600,6 +635,12 @@ SQDistanceComputer* select_distance_computer_neon(
                         Sim,
                         SIMDWIDTH>(d, trained);
             }
+
+        case ScalarQuantizer::QT_8bit_direct_signed:
+            return new DCTemplate_neon<
+                    Quantizer8bitDirectSigned_neon<SIMDWIDTH>,
+                    Sim,
+                    SIMDWIDTH>(d, trained);
     }
     FAISS_THROW_MSG("unknown qtype");
     return nullptr;
@@ -685,6 +726,11 @@ InvertedListScanner* sel1_InvertedListScanner_neon(
                         Similarity,
                         SIMDWIDTH>>(sq, quantizer, store_pairs, sel, r);
             }
+        case ScalarQuantizer::QT_8bit_direct_signed:
+            return sel2_InvertedListScanner_neon<DCTemplate_neon<
+                    Quantizer8bitDirectSigned_neon<SIMDWIDTH>,
+                    Similarity,
+                    SIMDWIDTH>>(sq, quantizer, store_pairs, sel, r);
     }
 
     FAISS_THROW_MSG("unknown qtype");

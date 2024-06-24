@@ -243,6 +243,34 @@ struct Quantizer8bitDirect_avx<8> : public Quantizer8bitDirect<1> {
     }
 };
 
+/*******************************************************************
+ * 8bit_direct_signed quantizer
+ *******************************************************************/
+
+template <int SIMDWIDTH>
+struct Quantizer8bitDirectSigned_avx {};
+
+template <>
+struct Quantizer8bitDirectSigned_avx<1> : public Quantizer8bitDirectSigned<1> {
+    Quantizer8bitDirectSigned_avx(size_t d, const std::vector<float>& unused)
+            : Quantizer8bitDirectSigned(d, unused) {}
+};
+
+template <>
+struct Quantizer8bitDirectSigned_avx<8> : public Quantizer8bitDirectSigned<1> {
+    Quantizer8bitDirectSigned_avx(size_t d, const std::vector<float>& trained)
+            : Quantizer8bitDirectSigned<1>(d, trained) {}
+
+    FAISS_ALWAYS_INLINE __m256
+    reconstruct_8_components(const uint8_t* code, int i) const {
+        __m128i x8 = _mm_loadl_epi64((__m128i*)(code + i)); // 8 * int8
+        __m256i y8 = _mm256_cvtepu8_epi32(x8);              // 8 * int32
+        __m256i c8 = _mm256_set1_epi32(128);
+        __m256i z8 = _mm256_sub_epi32(y8, c8); // subtract 128 from all lanes
+        return _mm256_cvtepi32_ps(z8);         // 8 * float32
+    }
+};
+
 template <int SIMDWIDTH>
 SQuantizer* select_quantizer_1_avx(
         QuantizerType qtype,
@@ -625,6 +653,12 @@ SQDistanceComputer* select_distance_computer_avx(
                         Sim,
                         SIMDWIDTH>(d, trained);
             }
+
+        case ScalarQuantizer::QT_8bit_direct_signed:
+            return new DCTemplate_avx<
+                    Quantizer8bitDirectSigned_avx<SIMDWIDTH>,
+                    Sim,
+                    SIMDWIDTH>(d, trained);
     }
     FAISS_THROW_MSG("unknown qtype");
     return nullptr;
@@ -710,6 +744,11 @@ InvertedListScanner* sel1_InvertedListScanner_avx(
                         Similarity,
                         SIMDWIDTH>>(sq, quantizer, store_pairs, sel, r);
             }
+        case ScalarQuantizer::QT_8bit_direct_signed:
+            return sel2_InvertedListScanner_avx<DCTemplate_avx<
+                    Quantizer8bitDirectSigned_avx<SIMDWIDTH>,
+                    Similarity,
+                    SIMDWIDTH>>(sq, quantizer, store_pairs, sel, r);
     }
 
     FAISS_THROW_MSG("unknown qtype");

@@ -75,6 +75,7 @@ void ScalarQuantizer::set_derived_sizes() {
         case QT_8bit:
         case QT_8bit_uniform:
         case QT_8bit_direct:
+        case QT_8bit_direct_signed:
             code_size = d;
             bits = 8;
             break;
@@ -132,6 +133,7 @@ void ScalarQuantizer::train(size_t n, const float* x) {
         case QT_fp16:
         case QT_8bit_direct:
         case QT_bf16:
+        case QT_8bit_direct_signed:
             // no training necessary
             break;
     }
