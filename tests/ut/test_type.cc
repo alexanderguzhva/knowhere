@@ -15,6 +15,7 @@
 #include "simd/distances_ref.h"
 #include "simd/hook.h"
 #include "utils.h"
+#include "knowhere/utils.h"
 
 TEST_CASE("Test bf16 patch", "[bf16 patch]") {
     const int64_t nb = 1000, nq = 10;

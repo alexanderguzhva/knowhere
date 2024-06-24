@@ -298,6 +298,8 @@ SQuantizer* select_quantizer_1_avx(
             return new QuantizerBF16_avx<SIMDWIDTH>(d, trained);
         case QuantizerType::QT_8bit_direct:
             return new Quantizer8bitDirect_avx<SIMDWIDTH>(d, trained);
+        case QuantizerType::QT_8bit_direct_signed:
+            return new Quantizer8bitDirectSigned_avx<SIMDWIDTH>(d, trained);
     }
     FAISS_THROW_MSG("unknown qtype");
 }

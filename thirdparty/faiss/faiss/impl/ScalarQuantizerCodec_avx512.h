@@ -340,6 +340,8 @@ SQuantizer* select_quantizer_1_avx512(
             return new QuantizerBF16_avx512<SIMDWIDTH>(d, trained);
         case QuantizerType::QT_8bit_direct:
             return new Quantizer8bitDirect_avx512<SIMDWIDTH>(d, trained);
+        case QuantizerType::QT_8bit_direct_signed:
+            return new Quantizer8bitDirectSigned_avx512<SIMDWIDTH>(d, trained);
     }
     FAISS_THROW_MSG("unknown qtype");
 }
@@ -831,7 +833,7 @@ InvertedListScanner* sel1_InvertedListScanner_avx512(
             }
         case ScalarQuantizer::QT_8bit_direct_signed:
             return sel2_InvertedListScanner_avx512<DCTemplate_avx512<
-                    Quantizer8bitDirectSigned_avx<SIMDWIDTH>,
+                    Quantizer8bitDirectSigned_avx512<SIMDWIDTH>,
                     Similarity,
                     SIMDWIDTH>>(sq, quantizer, store_pairs, sel, r);
     }

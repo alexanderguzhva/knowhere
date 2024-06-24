@@ -278,6 +278,8 @@ SQuantizer* select_quantizer_1_neon(
             return new QuantizerBF16_neon<SIMDWIDTH>(d, trained);
         case QuantizerType::QT_8bit_direct:
             return new Quantizer8bitDirect_neon<SIMDWIDTH>(d, trained);
+        case QuantizerType::QT_8bit_direct_signed:
+            return new Quantizer8bitDirectSigned_neon<SIMDWIDTH>(d, trained);
     }
     FAISS_THROW_MSG("unknown qtype");
 }
