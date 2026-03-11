@@ -10,7 +10,7 @@
 #include <memory>
 
 #include <faiss/cppcontrib/knowhere/IndexIVF.h>
-#include <faiss/impl/LookupTableScaler.h>
+#include <faiss/cppcontrib/knowhere/impl/LookupTableScaler.h>
 #include <faiss/utils/AlignedTable.h>
 
 #include <faiss/cppcontrib/knowhere/impl/simd_result_handlers.h>

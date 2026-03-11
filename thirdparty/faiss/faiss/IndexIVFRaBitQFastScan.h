@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include <faiss/IndexIVFFastScan.h>
@@ -15,7 +16,7 @@
 #include <faiss/impl/RaBitQStats.h>
 #include <faiss/impl/RaBitQUtils.h>
 #include <faiss/impl/RaBitQuantizer.h>
-#include <faiss/impl/simd_result_handlers.h>
+#include <faiss/impl/fast_scan/rabitq_result_handler.h>
 #include <faiss/utils/AlignedTable.h>
 #include <faiss/utils/Heap.h>
 
@@ -55,17 +56,6 @@ struct IndexIVFRaBitQFastScan : IndexIVFFastScan {
     /// Use zero-centered scalar quantizer for queries
     bool centered = false;
 
-    /// Per-vector auxiliary data (1-bit codes stored separately in `codes`)
-    ///
-    /// 1-bit codes (sign bits) are stored in the inherited `codes` array from
-    /// IndexFastScan in packed FastScan format for SIMD processing.
-    ///
-    /// This flat_storage holds per-vector factors and refinement-bit codes:
-    /// Layout for 1-bit: [SignBitFactors (8 bytes)]
-    /// Layout for multi-bit: [SignBitFactorsWithError
-    /// (12B)][ref_codes][ExtraBitsFactors (8B)]
-    std::vector<uint8_t> flat_storage;
-
     // Constructors
 
     IndexIVFRaBitQFastScan();
@@ -94,16 +84,20 @@ struct IndexIVFRaBitQFastScan : IndexIVFFastScan {
             bool include_listnos = false) const override;
 
    protected:
-    /// Extract and store RaBitQ factors from encoded vectors
-    void preprocess_code_metadata(
-            idx_t n,
-            const uint8_t* flat_codes,
-            idx_t start_global_idx) override;
-
     /// Return code_size as stride to skip embedded factor data during packing
     size_t code_packing_stride() const override;
 
    public:
+    /// Return CodePackerRaBitQ with enlarged block size
+    CodePacker* get_CodePacker() const override;
+
+    /// Write per-vector auxiliary data into block auxiliary region
+    void postprocess_packed_codes(
+            idx_t list_no,
+            size_t list_offset,
+            size_t n_added,
+            const uint8_t* flat_codes) override;
+
     /// Reconstruct a single vector from an inverted list
     void reconstruct_from_offset(int64_t list_no, int64_t offset, float* recons)
             const override;
@@ -111,7 +105,7 @@ struct IndexIVFRaBitQFastScan : IndexIVFFastScan {
     /// Override sa_decode to handle RaBitQ reconstruction
     void sa_decode(idx_t n, const uint8_t* bytes, float* x) const override;
 
-    /// Compute storage size per vector in flat_storage based on nb_bits
+    /// Compute per-vector auxiliary storage size based on nb_bits
     size_t compute_per_vector_storage_size() const;
 
    private:
@@ -166,87 +160,16 @@ struct IndexIVFRaBitQFastScan : IndexIVFFastScan {
             const FastScanDistancePostProcessing& context,
             const float* normalizers = nullptr) const override;
 
-    /** SIMD result handler for IndexIVFRaBitQFastScan that applies
-     * RaBitQ-specific distance corrections during batch processing.
-     *
-     * This handler processes batches of 32 distance computations from SIMD
-     * kernels, applies RaBitQ distance formula adjustments (factors and
-     * normalizers), and immediately updates result heaps. This eliminates the
-     * need for post-processing and provides significant performance benefits.
-     *
-     * Key optimizations:
-     * - Direct heap integration with no intermediate result storage
-     * - Batch-level computation of normalizers and query factors
-     * - Specialized handling for both centered and non-centered quantization
-     * modes
-     * - Efficient inner product metric corrections
-     * - Uses runtime boolean for multi-bit mode
-     *
-     * @tparam C Comparator type (CMin/CMax) for heap operations
-     */
+    /// Get an InvertedListScanner for single-query scanning.
+    /// This provides compatibility with the standard IVF search interface
+    InvertedListScanner* get_InvertedListScanner(
+            bool store_pairs = false,
+            const IDSelector* sel = nullptr,
+            const IVFSearchParameters* params = nullptr) const override;
+
+    /// RaBitQ-specific result handler (defined in impl/fast_scan/)
     template <class C>
-    struct IVFRaBitQHeapHandler
-            : simd_result_handlers::ResultHandlerCompare<C, true> {
-        const IndexIVFRaBitQFastScan* index;
-        float* heap_distances; // [nq * k]
-        int64_t* heap_labels;  // [nq * k]
-        const size_t nq, k;
-        size_t current_list_no = 0;
-        std::vector<int>
-                probe_indices; // probe index for each query in current batch
-        const FastScanDistancePostProcessing*
-                context;        // Processing context with query factors
-        const bool is_multibit; // Whether to use multi-bit two-stage search
-
-        // Use float-based comparator for heap operations
-        using Cfloat = typename std::conditional<
-                C::is_max,
-                CMax<float, int64_t>,
-                CMin<float, int64_t>>::type;
-
-        IVFRaBitQHeapHandler(
-                const IndexIVFRaBitQFastScan* idx,
-                size_t nq_val,
-                size_t k_val,
-                float* distances,
-                int64_t* labels,
-                const FastScanDistancePostProcessing* ctx = nullptr,
-                bool multibit = false);
-
-        void handle(size_t q, size_t b, simd16uint16 d0, simd16uint16 d1)
-                override;
-
-        /// Override base class virtual method to receive context information
-        void set_list_context(size_t list_no, const std::vector<int>& probe_map)
-                override;
-
-        void begin(const float* norms) override;
-
-        void end() override;
-
-       private:
-        /// Compute full multi-bit distance for a candidate vector (multi-bit
-        /// only)
-        /// @param db_idx Global database vector index
-        /// @param local_q Batch-local query index (for probe_indices access)
-        /// @param global_q Global query index (for storage indexing)
-        /// @param local_offset Offset within the current inverted list
-        float compute_full_multibit_distance(
-                size_t db_idx,
-                size_t local_q,
-                size_t global_q,
-                size_t local_offset) const;
-
-        /// Compute lower bound using 1-bit distance and error bound (multi-bit
-        /// only)
-        /// @param local_q Batch-local query index (for probe_indices access)
-        /// @param global_q Global query index (for storage indexing)
-        float compute_lower_bound(
-                float dist_1bit,
-                size_t db_idx,
-                size_t local_q,
-                size_t global_q) const;
-    };
+    using IVFRaBitQHeapHandler = simd_result_handlers::IVFRaBitQHeapHandler<C>;
 };
 
 } // namespace faiss

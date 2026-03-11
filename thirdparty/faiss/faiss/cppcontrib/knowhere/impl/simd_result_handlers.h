@@ -12,7 +12,7 @@
 #include <vector>
 
 #include <faiss/utils/Heap.h>
-#include <faiss/utils/simdlib.h>
+#include <faiss/cppcontrib/knowhere/utils/simdlib.h>
 
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/impl/IDSelector.h>
