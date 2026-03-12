@@ -18,7 +18,7 @@
 #include <faiss/impl/AuxIndexStructures.h>
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/cppcontrib/knowhere/utils/distances.h>
-#include <faiss/utils/simdlib.h>
+#include <faiss/cppcontrib/knowhere/utils/simdlib.h>
 #include <faiss/utils/utils.h>
 
 #include <faiss/cppcontrib/knowhere/invlists/BlockInvertedLists.h>

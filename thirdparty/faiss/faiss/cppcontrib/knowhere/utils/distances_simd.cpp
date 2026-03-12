@@ -15,7 +15,7 @@
 
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/impl/platform_macros.h>
-#include <faiss/utils/simdlib.h>
+#include <faiss/cppcontrib/knowhere/utils/simdlib.h>
 
 
 

@@ -32,7 +32,7 @@
 #include <faiss/cppcontrib/knowhere/IndexIVFPQ.h>
 #include <faiss/cppcontrib/knowhere/IndexIVFPQFastScan.h>
 #include <faiss/cppcontrib/knowhere/IndexIVFRaBitQ.h>
-#include <faiss/cppcontrib/knowhere/IndexPQ.h>
+#include <faiss/IndexPQ.h>
 #include <faiss/IndexPreTransform.h>
 #include <faiss/cppcontrib/knowhere/IndexRefine.h>
 #include <faiss/cppcontrib/knowhere/IndexSQ4Uniform.h>
@@ -53,6 +53,7 @@
 
 
 namespace faiss::cppcontrib::knowhere {
+
 
 uint32_t read_value(IOReader* f) {
     uint32_t h;
@@ -888,20 +889,6 @@ Index* read_index(IOReader* f, int io_flags) {
                 memcpy(ail->codes[i].data(), vec.data(), ail->codes[i].size());
             }
         }
-        idx = ivfl;
-    } else if (h == fourcc("IwFd")) {
-        IndexIVFFlatDedup* ivfl = new IndexIVFFlatDedup();
-        read_ivf_header(ivfl, f);
-        ivfl->code_size = ivfl->d * sizeof(float);
-        {
-            std::vector<idx_t> tab;
-            READVECTOR(tab);
-            for (long i = 0; i < tab.size(); i += 2) {
-                std::pair<idx_t, idx_t> pair(tab[i], tab[i + 1]);
-                ivfl->instances.insert(pair);
-            }
-        }
-        read_InvertedLists(ivfl, f, io_flags);
         idx = ivfl;
     } else if (h == fourcc("IwFc")) { // legacy
         IndexIVFFlatCC* ivf_cc;

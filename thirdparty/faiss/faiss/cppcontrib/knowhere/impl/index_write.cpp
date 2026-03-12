@@ -31,7 +31,7 @@
 #include <faiss/cppcontrib/knowhere/IndexIVFPQ.h>
 #include <faiss/cppcontrib/knowhere/IndexIVFPQFastScan.h>
 #include <faiss/cppcontrib/knowhere/IndexIVFRaBitQ.h>
-#include <faiss/cppcontrib/knowhere/IndexPQ.h>
+#include <faiss/IndexPQ.h>
 #include <faiss/IndexPreTransform.h>
 #include <faiss/cppcontrib/knowhere/IndexRefine.h>
 #include <faiss/cppcontrib/knowhere/IndexSQ4Uniform.h>
@@ -65,6 +65,7 @@
 
 
 namespace faiss::cppcontrib::knowhere {
+
 
 /*************************************************************
  * Write
@@ -593,23 +594,6 @@ void write_index(const Index* idx, IOWriter* f, int io_flags) {
         write_index_header(idx, f);
         write_ScalarQuantizer(&idxs->sq, f);
         WRITEVECTOR(idxs->codes);
-    } else if (
-            const IndexIVFFlatDedup* ivfl =
-                    dynamic_cast<const IndexIVFFlatDedup*>(idx)) {
-        uint32_t h = fourcc("IwFd");
-        WRITE1(h);
-        write_ivf_header(ivfl, f);
-        {
-            std::vector<idx_t> tab(2 * ivfl->instances.size());
-            long i = 0;
-            for (auto it = ivfl->instances.begin(); it != ivfl->instances.end();
-                 ++it) {
-                tab[i++] = it->first;
-                tab[i++] = it->second;
-            }
-            WRITEVECTOR(tab);
-        }
-        write_InvertedLists(ivfl->invlists, f);
     } else if (
             const IndexIVFFlat* ivfl =
                     dynamic_cast<const IndexIVFFlatCC*>(idx)) {

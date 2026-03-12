@@ -11,7 +11,7 @@
 #include <cstdlib>
 
 #include <faiss/impl/CodePacker.h>
-#include <faiss/impl/LookupTableScaler.h>
+#include <faiss/cppcontrib/knowhere/impl/LookupTableScaler.h>
 #include <faiss/cppcontrib/knowhere/impl/simd_result_handlers.h>
 
 /** PQ4 SIMD packing and accumulation functions
@@ -95,6 +95,8 @@ struct CodePackerPQ4 : CodePacker {
     size_t nsq;
 
     CodePackerPQ4(size_t nsq, size_t bbs);
+
+    CodePacker* clone() const final;
 
     void pack_1(const uint8_t* flat_code, size_t offset, uint8_t* block)
             const final;

@@ -8,7 +8,7 @@
 #include <faiss/cppcontrib/knowhere/impl/pq4_fast_scan.h>
 
 #include <faiss/impl/FaissAssert.h>
-#include <faiss/impl/LookupTableScaler.h>
+#include <faiss/cppcontrib/knowhere/impl/LookupTableScaler.h>
 #include <faiss/cppcontrib/knowhere/impl/simd_result_handlers.h>
 
 

@@ -10,9 +10,9 @@
 #include <type_traits>
 
 #include <faiss/impl/FaissAssert.h>
-#include <faiss/impl/LookupTableScaler.h>
+#include <faiss/cppcontrib/knowhere/impl/LookupTableScaler.h>
 #include <faiss/cppcontrib/knowhere/impl/simd_result_handlers.h>
-#include <faiss/utils/simdlib.h>
+#include <faiss/cppcontrib/knowhere/utils/simdlib.h>
 
 
 
