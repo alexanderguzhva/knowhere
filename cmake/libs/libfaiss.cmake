@@ -45,7 +45,7 @@ knowhere_file_glob(
   thirdparty/faiss/faiss/cppcontrib/knowhere/utils/partitioning_avx2.cpp
   thirdparty/faiss/faiss/cppcontrib/knowhere/IndexIVFFastScan.cpp
   thirdparty/faiss/faiss/cppcontrib/knowhere/IndexIVFPQFastScan.cpp
-  thirdparty/faiss/faiss/cppcontrib/knowhere/IVFIteratorWorkspace.cpp
+  thirdparty/faiss/faiss/cppcontrib/knowhere/IVFFastScanIteratorWorkspace.cpp
 )
 knowhere_file_glob(
   GLOB

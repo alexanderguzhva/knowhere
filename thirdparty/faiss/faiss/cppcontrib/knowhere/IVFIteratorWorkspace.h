@@ -15,14 +15,10 @@
 
 #include <faiss/MetricType.h>
 #include <faiss/impl/DistanceComputer.h>
-#include <faiss/utils/AlignedTable.h>
 
 #include "knowhere/object.h"
 
 namespace faiss {
-
-struct SIMDResultHandlerToFloat;
-
 namespace cppcontrib {
 namespace knowhere {
 
@@ -30,9 +26,6 @@ struct SearchParametersIVF;
 using IVFSearchParameters = SearchParametersIVF;
 
 struct IndexIVF;
-struct IndexIVFFastScan;
-struct IndexScaNN;
-struct IndexIVFPQFastScan;
 
 /// Base workspace for IVF iterator lifecycle.
 /// Holds query data, coarse quantization results, and iteration state.
@@ -60,42 +53,6 @@ struct IVFIteratorWorkspace {
     std::unique_ptr<size_t[]> coarse_list_sizes =
             nullptr; // snapshot of the list_size
     std::unique_ptr<DistanceComputer> dis_refine;
-};
-
-/// Iterator workspace for FastScan index types.
-/// Adds SIMD look-up tables, normalizers, and the index pointer for scanning.
-struct IVFFastScanIteratorWorkspace : IVFIteratorWorkspace {
-    const IndexIVFFastScan* index;
-
-    IVFFastScanIteratorWorkspace(
-            const IndexIVFFastScan* index,
-            const float* query_data,
-            const IVFSearchParameters* params);
-
-    void next_batch(size_t current_backup_count) override;
-
-    // one query call, no qbs
-    void get_interator_next_batch_implem_10(
-            faiss::SIMDResultHandlerToFloat& handler,
-            size_t current_backup_count);
-
-    size_t dim12;
-    AlignedTable<uint8_t> dis_tables;
-    AlignedTable<uint16_t> biases;
-    float normalizers[2];
-};
-
-/// Standalone iterator workspace for IndexScaNN.
-/// Wraps an IVFFastScanIteratorWorkspace with optional refinement.
-struct ScaNNIteratorWorkspace : IVFIteratorWorkspace {
-    /// The inner FastScan workspace.
-    std::unique_ptr<IVFIteratorWorkspace> inner;
-
-    ScaNNIteratorWorkspace(const IndexScaNN* scann_index,
-                           const float* query_data,
-                           const IVFSearchParameters* params);
-
-    void next_batch(size_t current_backup_count) override;
 };
 
 /// Standalone iterator workspace for base IVF index types

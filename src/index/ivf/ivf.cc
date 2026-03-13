@@ -12,6 +12,7 @@
 #include <faiss/cppcontrib/knowhere/IndexFlatElkan.h>
 #include <faiss/cppcontrib/knowhere/IndexIVFScalarQuantizerCC.h>
 #include <faiss/cppcontrib/knowhere/IndexScaNN.h>
+#include <faiss/cppcontrib/knowhere/IVFFastScanIteratorWorkspace.h>
 #include <faiss/cppcontrib/knowhere/IVFIteratorWorkspace.h>
 
 #include "common/metric.h"
