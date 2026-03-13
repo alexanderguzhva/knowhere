@@ -12,6 +12,7 @@
 #include "hook.h"
 
 #include <faiss/cppcontrib/knowhere/FaissHook.h>
+#include <faiss/utils/simd_levels.h>
 
 #include <mutex>
 
@@ -537,6 +538,40 @@ fvec_hook(std::string& simd_type) {
     //
     simd_type = "PPC";
     support_pq_fast_scan = false;
+#endif
+
+    // Synchronize faiss DD (Dynamic Dispatch) level with the knowhere hook decision.
+    // This ensures that when fvec_hook() is called standalone (not through
+    // KnowhereConfig::SetSimdType), the faiss DD level matches the SIMD level
+    // selected by the hook. Without this, faiss DD auto-detects independently
+    // and may dispatch to AVX2/AVX512 even when knowhere has been configured
+    // for a lower SIMD level (e.g. SSE4.2).
+    //
+    // Guard with is_simd_level_available(NONE) to handle static initialization
+    // order: if faiss's SIMDConfig static initializer hasn't run yet,
+    // supported_simd_levels is 0 and set_level() would throw.
+#if defined(__x86_64__)
+    if (faiss::SIMDConfig::is_simd_level_available(faiss::SIMDLevel::NONE)) {
+        faiss::SIMDLevel target_level = faiss::SIMDLevel::NONE;
+        if (simd_type == "AVX512") {
+            target_level = faiss::SIMDConfig::is_simd_level_available(faiss::SIMDLevel::AVX512)
+                               ? faiss::SIMDLevel::AVX512
+                               : faiss::SIMDConfig::auto_detect_simd_level();
+        } else if (simd_type == "AVX2") {
+            target_level = faiss::SIMDConfig::is_simd_level_available(faiss::SIMDLevel::AVX2)
+                               ? faiss::SIMDLevel::AVX2
+                               : faiss::SIMDConfig::auto_detect_simd_level();
+        }
+        // SSE4_2 and GENERIC both map to NONE (faiss DD has no SSE level)
+        faiss::SIMDConfig::set_level(target_level);
+    }
+#endif
+
+#if defined(__aarch64__)
+    if (faiss::SIMDConfig::is_simd_level_available(faiss::SIMDLevel::NONE)) {
+        faiss::SIMDLevel target_level = faiss::SIMDConfig::auto_detect_simd_level();
+        faiss::SIMDConfig::set_level(target_level);
+    }
 #endif
 }
 

@@ -92,31 +92,7 @@ KnowhereConfig::SetSimdType(const SimdType simd_type) {
     std::string simd_str;
     faiss::cppcontrib::knowhere::fvec_hook(simd_str);
     LOG_KNOWHERE_INFO_ << "FAISS hook " << simd_str;
-
-    // Synchronize faiss DD (Dynamic Dispatch) level
-#ifdef __x86_64__
-    faiss::SIMDLevel target_level = faiss::SIMDLevel::NONE;
-    if (simd_type == SimdType::AUTO) {
-        target_level = faiss::SIMDConfig::auto_detect_simd_level();
-    } else if (simd_type == SimdType::AVX512) {
-        target_level = faiss::SIMDConfig::is_simd_level_available(faiss::SIMDLevel::AVX512)
-                           ? faiss::SIMDLevel::AVX512
-                           : faiss::SIMDConfig::auto_detect_simd_level();
-    } else if (simd_type == SimdType::AVX2) {
-        target_level = faiss::SIMDConfig::is_simd_level_available(faiss::SIMDLevel::AVX2)
-                           ? faiss::SIMDLevel::AVX2
-                           : faiss::SIMDConfig::auto_detect_simd_level();
-    }
-    // SSE4_2 and GENERIC both map to NONE (faiss DD has no SSE level)
-    faiss::SIMDConfig::set_level(target_level);
     LOG_KNOWHERE_INFO_ << "FAISS DD level set to " << faiss::SIMDConfig::get_level_name();
-#endif
-
-#ifdef __aarch64__
-    faiss::SIMDLevel target_level = faiss::SIMDConfig::auto_detect_simd_level();
-    faiss::SIMDConfig::set_level(target_level);
-    LOG_KNOWHERE_INFO_ << "FAISS DD level set to " << faiss::SIMDConfig::get_level_name();
-#endif
 
     return simd_str;
 }
