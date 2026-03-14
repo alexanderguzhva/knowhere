@@ -10,10 +10,11 @@
 #include <memory>
 
 #include <faiss/cppcontrib/knowhere/IndexIVF.h>
-#include <faiss/cppcontrib/knowhere/impl/LookupTableScaler.h>
+#include <faiss/impl/fast_scan/fast_scan.h>
+#include <faiss/impl/fast_scan/FastScanDistancePostProcessing.h>
 #include <faiss/utils/AlignedTable.h>
 
-#include <faiss/cppcontrib/knowhere/impl/simd_result_handlers.h>
+#include <faiss/impl/fast_scan/simd_result_handlers.h>
 
 namespace faiss {
 namespace cppcontrib {
@@ -108,7 +109,8 @@ struct IndexIVFFastScan : IndexIVF {
             const float* x,
             const CoarseQuantized& cq,
             AlignedTable<float>& dis_tables,
-            AlignedTable<float>& biases) const = 0;
+            AlignedTable<float>& biases,
+            const FastScanDistancePostProcessing& context) const = 0;
 
     void compute_LUT_uint8(
             size_t n,
@@ -116,7 +118,8 @@ struct IndexIVFFastScan : IndexIVF {
             const CoarseQuantized& cq,
             AlignedTable<uint8_t>& dis_tables,
             AlignedTable<uint16_t>& biases,
-            float* normalizers) const;
+            float* normalizers,
+            const FastScanDistancePostProcessing& context) const;
 
     void search(
             idx_t n,
@@ -149,6 +152,18 @@ struct IndexIVFFastScan : IndexIVF {
 
     // internal search funcs
 
+    /// Create a KNN scanner for the given parameters.
+    /// Subclasses can override to provide specialized scanners.
+    virtual std::unique_ptr<FastScanCodeScanner> make_knn_scanner(
+            bool is_max,
+            idx_t n,
+            idx_t k,
+            float* distances,
+            idx_t* labels,
+            const IDSelector* sel,
+            int impl = 0,
+            const FastScanDistancePostProcessing& context = {}) const;
+
     // dispatch to implementations and parallelize
     void search_dispatch_implem(
             idx_t n,
@@ -157,7 +172,7 @@ struct IndexIVFFastScan : IndexIVF {
             float* distances,
             idx_t* labels,
             const CoarseQuantized& cq,
-            const NormTableScaler* scaler,
+            const FastScanDistancePostProcessing& context,
             const IVFSearchParameters* params = nullptr) const;
 
     void range_search_dispatch_implem(
@@ -166,7 +181,7 @@ struct IndexIVFFastScan : IndexIVF {
             float radius,
             RangeSearchResult& rres,
             const CoarseQuantized& cq_in,
-            const NormTableScaler* scaler,
+            const FastScanDistancePostProcessing& context,
             const IVFSearchParameters* params = nullptr) const;
 
     // impl 1 and 2 are just for verification
@@ -178,7 +193,7 @@ struct IndexIVFFastScan : IndexIVF {
             float* distances,
             idx_t* labels,
             const CoarseQuantized& cq,
-            const NormTableScaler* scaler,
+            const FastScanDistancePostProcessing& context,
             const IVFSearchParameters* params = nullptr) const;
 
     template <class C>
@@ -189,7 +204,7 @@ struct IndexIVFFastScan : IndexIVF {
             float* distances,
             idx_t* labels,
             const CoarseQuantized& cq,
-            const NormTableScaler* scaler,
+            const FastScanDistancePostProcessing& context,
             const IVFSearchParameters* params = nullptr) const;
 
     // implem 10 and 12 are not multithreaded internally, so
@@ -202,8 +217,9 @@ struct IndexIVFFastScan : IndexIVF {
             const CoarseQuantized& cq,
             size_t* ndis_out,
             size_t* nlist_out,
-            const NormTableScaler* scaler,
-            const IVFSearchParameters* params = nullptr) const;
+            const FastScanDistancePostProcessing& context,
+            const IVFSearchParameters* params,
+            FastScanCodeScanner& scanner) const;
 
     void range_search_implem_10(
             idx_t n,
@@ -212,8 +228,9 @@ struct IndexIVFFastScan : IndexIVF {
             const CoarseQuantized& cq,
             size_t* ndis_out,
             size_t* nlist_out,
-            const NormTableScaler* scaler,
-            const IVFSearchParameters* params = nullptr) const;
+            const FastScanDistancePostProcessing& context,
+            const IVFSearchParameters* params,
+            FastScanCodeScanner& scanner) const;
 
     void search_implem_12(
             idx_t n,
@@ -222,8 +239,9 @@ struct IndexIVFFastScan : IndexIVF {
             const CoarseQuantized& cq,
             size_t* ndis_out,
             size_t* nlist_out,
-            const NormTableScaler* scaler,
-            const IVFSearchParameters* params = nullptr) const;
+            const FastScanDistancePostProcessing& context,
+            const IVFSearchParameters* params,
+            FastScanCodeScanner& scanner) const;
 
     void range_search_implem_12(
             idx_t n,
@@ -232,8 +250,9 @@ struct IndexIVFFastScan : IndexIVF {
             const CoarseQuantized& cq,
             size_t* ndis_out,
             size_t* nlist_out,
-            const NormTableScaler* scaler,
-            const IVFSearchParameters* params = nullptr) const;
+            const FastScanDistancePostProcessing& context,
+            const IVFSearchParameters* params,
+            FastScanCodeScanner& scanner) const;
 
     // implem 14 is multithreaded internally across nprobes and queries
     void search_implem_14(
@@ -244,7 +263,7 @@ struct IndexIVFFastScan : IndexIVF {
             idx_t* labels,
             const CoarseQuantized& cq,
             int impl,
-            const NormTableScaler* scaler,
+            const FastScanDistancePostProcessing& context,
             const IVFSearchParameters* params = nullptr) const;
 
     // reconstruct vectors from packed invlists
@@ -252,6 +271,10 @@ struct IndexIVFFastScan : IndexIVF {
             const override;
 
     CodePacker* get_CodePacker() const override;
+
+    /// Stride in bytes between consecutive SIMD blocks.
+    /// Derived from get_CodePacker()->block_size.
+    size_t get_block_stride() const;
 
     // reconstruct orig invlists (for debugging)
     void reconstruct_orig_invlists();

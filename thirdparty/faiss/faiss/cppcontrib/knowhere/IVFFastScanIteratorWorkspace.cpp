@@ -14,8 +14,10 @@
 #include <faiss/cppcontrib/knowhere/IndexCosine.h>
 #include <faiss/cppcontrib/knowhere/IndexIVFPQFastScan.h>
 #include <faiss/cppcontrib/knowhere/IndexScaNN.h>
-#include <faiss/cppcontrib/knowhere/impl/pq4_fast_scan.h>
-#include <faiss/cppcontrib/knowhere/impl/simd_result_handlers.h>
+#include <faiss/impl/fast_scan/accumulate_loops.h>
+#include <faiss/impl/fast_scan/fast_scan.h>
+#include <faiss/impl/fast_scan/LookupTableScaler.h>
+#include <faiss/impl/fast_scan/simd_result_handlers.h>
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/utils/AlignedTable.h>
 
@@ -98,13 +100,15 @@ IVFFastScanIteratorWorkspace::IVFFastScanIteratorWorkspace(
             this->nprobe,
             this->coarse_dis.get(),
             this->coarse_idx.get()};
+    faiss::FastScanDistancePostProcessing empty_context{};
     index_in->compute_LUT_uint8(
             1,
             this->query_data.data(),
             cq,
             impl_->dis_tables,
             impl_->biases,
-            impl_->normalizers);
+            impl_->normalizers,
+            empty_context);
 }
 
 IVFFastScanIteratorWorkspace::~IVFFastScanIteratorWorkspace() = default;
@@ -118,6 +122,10 @@ void IVFFastScanIteratorWorkspace::Impl::next_batch(
         size_t current_backup_count) {
     ws.dists.clear();
 
+    // Baseline SingleQueryResultCollectHandler uses std::pair<TI, T>;
+    // we convert to knowhere::DistId after scanning.
+    std::vector<std::pair<int64_t, float>> pairs;
+
     std::unique_ptr<SIMDResultHandlerToFloat> handler;
     bool is_max = !faiss::is_similarity_metric(index->metric_type);
     auto id_selector = ws.search_params->sel
@@ -128,15 +136,21 @@ void IVFFastScanIteratorWorkspace::Impl::next_batch(
         handler.reset(
                 new SingleQueryResultCollectHandler<
                         CMax<uint16_t, int64_t>,
-                        true>(ws.dists, index->ntotal, id_selector));
+                        true>(pairs, index->ntotal, id_selector));
     } else {
         handler.reset(
                 new SingleQueryResultCollectHandler<
                         CMin<uint16_t, int64_t>,
-                        true>(ws.dists, index->ntotal, id_selector));
+                        true>(pairs, index->ntotal, id_selector));
     }
 
     this->get_interator_next_batch_implem_10(ws, *handler.get(), current_backup_count);
+
+    // Convert std::pair to knowhere::DistId
+    ws.dists.reserve(pairs.size());
+    for (auto& [id, dis] : pairs) {
+        ws.dists.emplace_back(id, dis);
+    }
 }
 
 void IVFFastScanIteratorWorkspace::Impl::get_interator_next_batch_implem_10(
@@ -146,12 +160,13 @@ void IVFFastScanIteratorWorkspace::Impl::get_interator_next_batch_implem_10(
     bool single_LUT = !index->lookup_table_is_3d();
     handler.begin(index->skip & 16 ? nullptr : this->normalizers);
     auto dim12_local = this->dim12;
+    const size_t block_stride = index->get_block_stride();
     const uint8_t* LUT = nullptr;
 
     if (single_LUT) {
         LUT = this->dis_tables.get();
     }
-    while (current_backup_count + ws.dists.size() <
+    while (current_backup_count + handler.in_range_num <
                    ws.backup_count_threshold &&
            ws.next_visit_coarse_list_idx < index->nlist) {
         auto next_list_idx = ws.next_visit_coarse_list_idx;
@@ -173,15 +188,19 @@ void IVFFastScanIteratorWorkspace::Impl::get_interator_next_batch_implem_10(
         InvertedLists::ScopedIds ids(index->invlists, list_no);
         handler.ntotal = ls;
         handler.id_map = ids.get();
-        pq4_accumulate_loop(
-                1,
-                roundup(ls, index->bbs),
-                index->bbs,
-                index->M2,
-                codes.get(),
-                LUT,
-                handler,
-                nullptr);
+        with_SIMDResultHandler(handler, [&](auto& concrete_handler) {
+            ::faiss::DummyScaler<> dummy;
+            ::faiss::pq4_accumulate_loop_fixed_scaler(
+                    1,
+                    roundup(ls, index->bbs),
+                    index->bbs,
+                    index->M2,
+                    codes.get(),
+                    LUT,
+                    concrete_handler,
+                    dummy,
+                    block_stride);
+        });
     }
     handler.end();
 }

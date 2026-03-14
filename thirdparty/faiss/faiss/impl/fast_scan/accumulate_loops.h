@@ -57,12 +57,29 @@ void accumulate_fixed_blocks(
         const Scaler& scaler,
         size_t block_stride) {
     constexpr int bbs = 32 * BB;
-    for (size_t j0 = 0; j0 < nb; j0 += bbs) {
+    for (size_t j0 = 0; j0 < nb; j0 += bbs, codes += block_stride) {
+        res.set_block_origin(0, j0);
+        // skip computing distances if all vectors inside a block are filtered out
+        if constexpr (has_sel_member_v<ResultHandler>) {
+            if (res.sel != nullptr) {
+                bool skip_flag = true;
+                for (size_t jj = 0;
+                     jj < std::min<size_t>(bbs, res.ntotal - j0);
+                     jj++) {
+                    auto real_idx = res.adjust_id(0, jj);
+                    if (res.sel->is_member(real_idx)) {
+                        skip_flag = false;
+                        break;
+                    }
+                }
+                if (skip_flag) {
+                    continue;
+                }
+            }
+        }
         FixedStorageHandler<NQ, 2 * BB> res2;
         kernel_accumulate_block<NQ, BB>(nsq, codes, LUT, res2, scaler);
-        res.set_block_origin(0, j0);
         res2.to_other_handler(res);
-        codes += block_stride;
     }
 }
 
@@ -123,7 +140,26 @@ void accumulate_q_4step_256(
     constexpr int Q4 = (QBS >> 12) & 15;
     constexpr int SQ = Q1 + Q2 + Q3 + Q4;
 
-    for (size_t j0 = 0; j0 < ntotal2; j0 += 32) {
+    for (size_t j0 = 0; j0 < ntotal2; j0 += 32, codes += block_stride) {
+        res.set_block_origin(0, j0);
+        // skip computing distances if all vectors inside a block are filtered out
+        if constexpr (has_sel_member_v<ResultHandler>) {
+            if (res.sel != nullptr) {
+                bool skip_flag = true;
+                for (size_t jj = 0;
+                     jj < std::min<size_t>(32, ntotal2 - j0);
+                     jj++) {
+                    auto real_idx = res.adjust_id(0, jj);
+                    if (res.sel->is_member(real_idx)) {
+                        skip_flag = false;
+                        break;
+                    }
+                }
+                if (skip_flag) {
+                    continue;
+                }
+            }
+        }
         FixedStorageHandler<SQ, 2> res2;
         const uint8_t* LUT = LUT0;
         pq4_kernel_qbs_256<Q1>(nsq, codes, LUT, res2, scaler);
@@ -142,9 +178,7 @@ void accumulate_q_4step_256(
             res2.set_block_origin(Q1 + Q2 + Q3, 0);
             pq4_kernel_qbs_256<Q4>(nsq, codes, LUT, res2, scaler);
         }
-        res.set_block_origin(0, j0);
         res2.to_other_handler(res);
-        codes += block_stride;
     }
 }
 
@@ -195,7 +229,26 @@ void pq4_accumulate_loop_qbs_fixed_scaler_256(
     }
 
     // Default: qbs not known at compile time
-    for (size_t j0 = 0; j0 < ntotal2; j0 += 32) {
+    for (size_t j0 = 0; j0 < ntotal2; j0 += 32, codes += block_stride) {
+        // skip computing distances if all vectors inside a block are filtered out
+        if constexpr (has_sel_member_v<ResultHandler>) {
+            if (res.sel != nullptr) {
+                res.set_block_origin(0, j0);
+                bool skip_flag = true;
+                for (size_t jj = 0;
+                     jj < std::min<size_t>(32, ntotal2 - j0);
+                     jj++) {
+                    auto real_idx = res.adjust_id(0, jj);
+                    if (res.sel->is_member(real_idx)) {
+                        skip_flag = false;
+                        break;
+                    }
+                }
+                if (skip_flag) {
+                    continue;
+                }
+            }
+        }
         const uint8_t* LUT = LUT0;
         int qi = qbs;
         int i0 = 0;
@@ -219,7 +272,6 @@ void pq4_accumulate_loop_qbs_fixed_scaler_256(
             i0 += nq;
             LUT += nq * nsq * 16;
         }
-        codes += block_stride;
     }
 }
 
